@@ -51,16 +51,16 @@
 
 ## Phase 3: Content Resolution & Page Rendering
 
-- [ ] T3.1: ContentFetcher interface + types
-- [ ] T3.2: GitContentFetcher (reads from local OPFS clone)
-- [ ] T3.3: GitHubApiFetcher (octokit Contents API fallback)
-- [ ] T3.4: FallbackContentFetcher (git → API composition)
-- [ ] T3.5: Path resolver (URL path → file path resolution)
-- [ ] T3.6: PageRenderer (iframe + SW approach)
-- [ ] T3.7: Asset interceptor (rewrite relative URLs)
-- [ ] T3.8: Link interceptor (client-side navigation for internal links)
+- [x] T3.1: ContentFetcher interface + types
+- [x] T3.2: GitContentFetcher (reads from local OPFS clone)
+- [x] T3.3: GitHubApiFetcher (octokit Contents API fallback)
+- [x] T3.4: FallbackContentFetcher (git → API composition)
+- [x] T3.5: Path resolver (URL path → file path resolution)
+- [x] T3.6: PageRenderer (iframe + SW approach)
+- [x] T3.7: Asset interceptor (rewrite relative URLs)
+- [x] T3.8: Link interceptor (client-side navigation for internal links)
 - [ ] T3.9: Wire into Router
-- [ ] T3.10: Tests
+- [x] T3.10: Tests
 - [ ] T3.11: BDD feature file
 
 ## Phase 4: Service Worker
