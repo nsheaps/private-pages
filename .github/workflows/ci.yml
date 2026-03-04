@@ -26,6 +26,7 @@ jobs:
 
       - name: Authenticate as GitHub App
         id: auth
+        if: ${{ secrets.AUTOMATION_GITHUB_APP_ID != '' }}
         uses: ./.github/actions/github-app-auth
         with:
           app-id: ${{ secrets.AUTOMATION_GITHUB_APP_ID }}
@@ -39,6 +40,7 @@ jobs:
 
       - name: Lint (auto-fix)
         id: lint
+        if: ${{ secrets.AUTOMATION_GITHUB_APP_ID != '' }}
         uses: ./.github/actions/lint-files
         with:
           fix: 'true'
@@ -55,6 +57,10 @@ jobs:
         run: |
           echo "Lint auto-fix committed changes or errors remain."
           exit 1
+
+      - name: Lint (check only)
+        if: ${{ secrets.AUTOMATION_GITHUB_APP_ID == '' }}
+        run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
