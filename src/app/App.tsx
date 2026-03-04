@@ -7,6 +7,7 @@ import { ErrorScreen } from '../ui/ErrorScreen';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { LoginScreen } from '../ui/LoginScreen';
 import { DeviceFlowScreen } from '../ui/DeviceFlowScreen';
+import { SiteView } from './SiteView';
 import type { ValidatedConfig } from '../config/schema';
 import type { DeviceFlowState, TokenInfo, UserInfo } from '../auth/types';
 
@@ -174,9 +175,11 @@ function AppContent({
 
     case 'ready':
       return (
-        <div id="private-pages-app">
-          <p>Signed in as {state.user.login}. Content rendering not yet implemented.</p>
-        </div>
+        <SiteView
+          config={state.config}
+          token={state.token}
+          userLogin={state.user.login}
+        />
       );
   }
 }

@@ -135,3 +135,147 @@ body {
 #private-pages-app {
   padding: 2rem;
 }
+
+/* Landing page */
+.pp-landing-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.pp-landing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.pp-user-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.pp-logout-button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #d1d5da;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.pp-site-list ul {
+  list-style: none;
+  padding: 0;
+}
+
+.pp-site-card {
+  margin-bottom: 0.5rem;
+}
+
+.pp-site-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #d1d5da;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pp-site-link:hover {
+  border-color: #0366d6;
+  background: #f6f8fa;
+}
+
+.pp-site-name {
+  font-weight: 600;
+}
+
+.pp-site-path {
+  font-family: monospace;
+  color: #586069;
+  font-size: 0.875rem;
+}
+
+.pp-site-branch {
+  font-size: 0.75rem;
+  color: #959da5;
+}
+
+/* Settings panel */
+.pp-settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  background: white;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  padding: 1.5rem;
+  z-index: 900;
+  overflow-y: auto;
+}
+
+.pp-settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.pp-settings-header button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.pp-settings-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.pp-danger-button {
+  color: #d32f2f;
+  border: 1px solid #d32f2f;
+  background: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Offline indicator */
+.pp-offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.5rem;
+  background: #ffc107;
+  color: #333;
+  text-align: center;
+  font-size: 0.875rem;
+  z-index: 1001;
+}
+
+/* Content container */
+.pp-content-container {
+  width: 100%;
+  min-height: calc(100vh - 24px);
+}
+
+.pp-user-info {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  padding: 0.25rem 1rem;
+  font-size: 0.75rem;
+  color: #959da5;
+}

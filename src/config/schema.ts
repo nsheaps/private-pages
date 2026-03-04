@@ -20,3 +20,4 @@ export const ConfigSchema = z.object({
 });
 
 export type ValidatedConfig = z.infer<typeof ConfigSchema>;
+export type SiteConfig = z.infer<typeof SiteConfigSchema>;
