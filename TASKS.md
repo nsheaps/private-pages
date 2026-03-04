@@ -18,11 +18,11 @@
 
 ## Phase 0: Foundation
 
-- [ ] T0.1: Config schema + loader (Zod validation)
-- [ ] T0.2: React entry point + App shell + error boundary
-- [ ] T0.3: Client-side router (hash-based)
-- [ ] T0.4: Skeleton UI components (LoginScreen, LoadingScreen, ErrorScreen)
-- [ ] T0.5: Unit + component tests, CI green
+- [x] T0.1: Config schema + loader (Zod validation)
+- [x] T0.2: React entry point + App shell + error boundary
+- [x] T0.3: Client-side router (hash-based)
+- [x] T0.4: Skeleton UI components (LoginScreen, LoadingScreen, ErrorScreen)
+- [x] T0.5: Unit + component tests, CI green
 
 ## Phase 1: Authentication
 
