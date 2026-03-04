@@ -37,16 +37,16 @@
 
 ## Phase 2: Git Clone & OPFS Storage
 
-- [ ] T2.1: GitClient interface + types
-- [ ] T2.2: OPFS helpers (directory structure, read/write, usage stats)
-- [ ] T2.3: OpfsAdapter (isomorphic-git `fs` backed by OPFS)
-- [ ] T2.4: Git auth helper (onAuth callback with stored token)
-- [ ] T2.5: GitClient class (clone, fetch, Web Locks)
-- [ ] T2.6: File reading from bare repo (tree walk + blob read)
-- [ ] T2.7: RepoState IndexedDB store
+- [x] T2.1: GitClient interface + types
+- [x] T2.2: OPFS helpers (directory structure, read/write, usage stats)
+- [x] T2.3: OpfsAdapter (isomorphic-git `fs` backed by OPFS)
+- [x] T2.4: Git auth helper (onAuth callback with stored token)
+- [x] T2.5: GitClient class (clone, fetch, Web Locks)
+- [x] T2.6: File reading from bare repo (tree walk + blob read)
+- [x] T2.7: RepoState IndexedDB store
 - [ ] T2.8: Clone progress UI
 - [ ] T2.9: Wire into App (auth → check OPFS → clone/fetch → render)
-- [ ] T2.10: Tests (OPFS adapter, git client with fixture repos)
+- [x] T2.10: Tests (OPFS adapter, git client with fixture repos)
 - [ ] T2.11: BDD feature file
 
 ## Phase 3: Content Resolution & Page Rendering
