@@ -2,44 +2,92 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['*']
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  validate:
+  lint:
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          node-version: 20
-          cache: npm
+          persist-credentials: false
 
-      - run: npm ci
+      - name: Authenticate as GitHub App
+        id: auth
+        uses: ./.github/actions/github-app-auth
+        with:
+          app-id: ${{ secrets.AUTOMATION_GITHUB_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_GITHUB_APP_PRIVATE_KEY }}
 
-      - name: Lint
-        run: npm run lint
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (auto-fix)
+        id: lint
+        uses: ./.github/actions/lint-files
+        with:
+          fix: 'true'
+        continue-on-error: true
+
+      - name: Auto-commit lint fixes
+        if: steps.lint.outputs.changed-or-failed == 'true' && !cancelled()
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: 'chore: auto-fix lint issues'
+
+      - name: Fail if lint had errors or changes
+        if: steps.lint.outputs.changed-or-failed == 'true' && !cancelled()
+        run: |
+          echo "Lint auto-fix committed changes or errors remain."
+          exit 1
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test
-
-  e2e:
+  test-unit:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    needs: validate
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+      - name: Install mise
+        uses: jdx/mise-action@v2
 
-      - run: npm ci
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -47,9 +95,26 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days: 7
+          retention-days: 14
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build

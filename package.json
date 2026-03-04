@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
     "validate": "npm run lint && npm run typecheck && npm run test"
   },
