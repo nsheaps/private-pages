@@ -1,0 +1,25 @@
+name: 'Preview Deploy for Private Pages'
+description: 'Deploy PR preview branches for Private Pages'
+
+inputs:
+  source-directory:
+    description: 'Directory containing built static files'
+    required: true
+  token:
+    description: 'GitHub token with repo write access'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Deploy preview
+      shell: bash
+      env:
+        SOURCE_DIR: ${{ inputs.source-directory }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        echo "Deploying preview for PR #$PR_NUMBER"
+        # Implementation will be added in Phase 5
+        echo "Preview deploy action placeholder"

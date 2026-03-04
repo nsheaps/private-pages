@@ -1,0 +1,34 @@
+name: 'Deploy to Private Pages'
+description: 'Deploy static files to a branch for serving via Private Pages'
+
+inputs:
+  source-directory:
+    description: 'Directory containing built static files'
+    required: true
+  target-branch:
+    description: 'Branch to deploy to'
+    required: false
+    default: 'gh-pages'
+  target-repo:
+    description: 'Target repository (owner/repo)'
+    required: false
+    default: ${{ github.repository }}
+  token:
+    description: 'GitHub token with repo write access'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Deploy to branch
+      shell: bash
+      env:
+        SOURCE_DIR: ${{ inputs.source-directory }}
+        TARGET_BRANCH: ${{ inputs.target-branch }}
+        TARGET_REPO: ${{ inputs.target-repo }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: |
+        echo "Deploying $SOURCE_DIR to $TARGET_REPO@$TARGET_BRANCH"
+        # Implementation will be added in Phase 5
+        echo "Deploy action placeholder"

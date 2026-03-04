@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.local
+
+# Test
+test-results/
+playwright-report/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
