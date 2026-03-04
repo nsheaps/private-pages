@@ -6,6 +6,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'isomorphic-git': ['isomorphic-git'],
+          react: ['react', 'react-dom'],
+        },
+      },
+    },
   },
   server: {
     port: 3000,

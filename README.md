@@ -74,6 +74,72 @@ Or via config file:
 }
 ```
 
+## Architecture
+
+```
+src/
+  app/        — React SPA shell, routing, layout
+  auth/       — GitHub OAuth (device flow + PKCE)
+  git/        — isomorphic-git in browser + OPFS adapter
+  content/    — ContentFetcher interface, GitHub API fallback, path resolution
+  renderer/   — Render fetched HTML in sandboxed iframe, asset interception
+  storage/    — OPFS, IndexedDB helpers
+  sw/         — Service Worker (intercepts iframe requests, serves from OPFS)
+  config/     — App config (Zod schema, loader)
+  ui/         — Shared React components
+  actions/    — GitHub Actions (not part of SPA bundle)
+```
+
+**Content fetching priority:** local OPFS clone (isomorphic-git) → GitHub API fallback.
+
+## Multi-Site Configuration
+
+Serve multiple private repos from a single deployment:
+
+```json
+{
+  "github": { "clientId": "Iv1.abc123" },
+  "sites": [
+    { "path": "/docs", "repo": "myorg/internal-docs" },
+    { "path": "/handbook", "repo": "myorg/employee-handbook", "branch": "main", "directory": "build/" },
+    { "path": "/api", "repo": "myorg/api-docs", "fetchTtlSeconds": 300 }
+  ]
+}
+```
+
+## GitHub Actions
+
+### Deploy Pages
+
+```yaml
+- uses: ./src/actions/deploy
+  with:
+    source-directory: dist
+    target-branch: gh-pages
+```
+
+### Preview Deploy
+
+```yaml
+- uses: ./src/actions/preview
+  with:
+    source-directory: dist
+```
+
+Creates `preview/pr-<N>` branches for PR previews, automatically cleaned up on PR close.
+
+## Security
+
+- Tokens are encrypted with AES-GCM (SubtleCrypto) before storing in IndexedDB
+- Encryption key is stored in OPFS (separate from the encrypted token)
+- Web Locks ensure concurrent tab safety during git operations
+- Content is rendered in sandboxed iframes
+
+## Browser Requirements
+
+- Chrome/Edge 86+, Firefox 111+, Safari 15.2+
+- Requires: OPFS, Service Worker, SubtleCrypto, Web Locks, IndexedDB
+
 ## License
 
-See [LICENSE](LICENSE).
+MIT
