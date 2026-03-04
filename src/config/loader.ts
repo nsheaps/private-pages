@@ -70,9 +70,11 @@ function loadFromEnvVars(): ValidatedConfig | null {
 }
 
 async function loadFromJsonFile(): Promise<ValidatedConfig> {
+  const base = import.meta.env.BASE_URL ?? '/';
+  const configUrl = `${base.endsWith('/') ? base : base + '/'}config.json`;
   let response: Response;
   try {
-    response = await fetch('/config.json');
+    response = await fetch(configUrl);
   } catch {
     throw new ConfigError(
       'No config found. Provide URL params (?repo=owner/repo&client_id=...), ' +
