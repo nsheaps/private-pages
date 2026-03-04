@@ -88,11 +88,11 @@
 ## Phase 6: Polish & UX
 
 - [ ] T6.1: Multi-site landing page
-- [ ] T6.2: Status bar component
+- [x] T6.2: Status bar component
 - [ ] T6.3: Settings UI
 - [ ] T6.4: Offline indicator
-- [ ] T6.5: Error polish
-- [ ] T6.6: Responsive design
+- [x] T6.5: Error polish
+- [x] T6.6: Responsive design (basic CSS)
 
 ## Phase 7: Build, Deploy & Release
 
