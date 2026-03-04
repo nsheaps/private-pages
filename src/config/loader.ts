@@ -18,10 +18,22 @@ export async function loadConfig(): Promise<ValidatedConfig> {
 
 function loadFromUrlParams(): ValidatedConfig | null {
   const params = new URLSearchParams(window.location.search);
-  const repo = params.get('repo');
   const clientId = params.get('client_id');
+  const repo = params.get('repo');
 
-  if (!repo || !clientId) return null;
+  if (!clientId) return null;
+
+  const sites = repo
+    ? [
+        {
+          path: params.get('path') ?? '/',
+          repo,
+          branch: params.get('branch') ?? 'main',
+          directory: params.get('dir') ?? '/',
+          ...(params.get('ttl') ? { fetchTtlSeconds: Number(params.get('ttl')) } : {}),
+        },
+      ]
+    : [];
 
   const raw = {
     github: {
@@ -29,15 +41,7 @@ function loadFromUrlParams(): ValidatedConfig | null {
       authMode: params.get('auth_mode') ?? 'device-flow',
       ...(params.get('cors_proxy') ? { corsProxy: params.get('cors_proxy') } : {}),
     },
-    sites: [
-      {
-        path: params.get('path') ?? '/',
-        repo,
-        branch: params.get('branch') ?? 'main',
-        directory: params.get('dir') ?? '/',
-        ...(params.get('ttl') ? { fetchTtlSeconds: Number(params.get('ttl')) } : {}),
-      },
-    ],
+    sites,
   };
 
   const result = ConfigSchema.safeParse(raw);

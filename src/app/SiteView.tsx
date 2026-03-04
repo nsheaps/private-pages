@@ -19,6 +19,7 @@ interface SiteViewProps {
   config: ValidatedConfig;
   token: TokenInfo;
   userLogin: string;
+  onLogout: () => void;
 }
 
 type ViewState =
@@ -33,7 +34,7 @@ function parseSiteRepo(repo: string): { owner: string; repoName: string } {
   return { owner: owner!, repoName: repoName! };
 }
 
-export function SiteView({ config, token, userLogin }: SiteViewProps) {
+export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) {
   const { route } = useRouter();
   const [viewState, setViewState] = useState<ViewState | null>(null);
   const [cloneProgress, setCloneProgress] = useState<CloneProgress | null>(null);
@@ -259,7 +260,10 @@ export function SiteView({ config, token, userLogin }: SiteViewProps) {
             repoName={matchedSite.repo}
           />
           <div className="pp-user-info">
-            Signed in as {userLogin}
+            Signed in as {userLogin}{' '}
+            <button onClick={onLogout} className="pp-logout-link">
+              Sign out
+            </button>
           </div>
         </>
       );

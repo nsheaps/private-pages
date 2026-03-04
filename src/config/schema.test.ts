@@ -46,14 +46,29 @@ describe('ConfigSchema', () => {
     }
   });
 
-  it('rejects config with no sites', () => {
+  it('accepts config with no sites (dynamic repo mode)', () => {
     const config = {
       github: { clientId: 'Iv1.abc123' },
       sites: [],
     };
 
     const result = ConfigSchema.safeParse(config);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sites).toEqual([]);
+    }
+  });
+
+  it('accepts config with sites omitted (defaults to empty)', () => {
+    const config = {
+      github: { clientId: 'Iv1.abc123' },
+    };
+
+    const result = ConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sites).toEqual([]);
+    }
   });
 
   it('rejects invalid repo format', () => {

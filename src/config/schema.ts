@@ -16,7 +16,7 @@ export const GithubConfigSchema = z.object({
 
 export const ConfigSchema = z.object({
   github: GithubConfigSchema,
-  sites: z.array(SiteConfigSchema).min(1),
+  sites: z.array(SiteConfigSchema).default([]),
 });
 
 export type ValidatedConfig = z.infer<typeof ConfigSchema>;
