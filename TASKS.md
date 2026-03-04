@@ -78,12 +78,12 @@
 
 ## Phase 5: GitHub Actions
 
-- [ ] T5.1: deploy-pages action
-- [ ] T5.2: preview-deploy action
-- [ ] T5.3: deploy-app action
+- [x] T5.1: deploy-pages action
+- [x] T5.2: preview-deploy action
+- [x] T5.3: deploy-app action (via deploy.yml)
 - [ ] T5.4: Action tests
 - [ ] T5.5: Action documentation
-- [ ] T5.6: Wire into CI/CD
+- [x] T5.6: Wire into CI/CD
 
 ## Phase 6: Polish & UX
 

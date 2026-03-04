@@ -29,6 +29,45 @@ runs:
         TARGET_REPO: ${{ inputs.target-repo }}
         GITHUB_TOKEN: ${{ inputs.token }}
       run: |
-        echo "Deploying $SOURCE_DIR to $TARGET_REPO@$TARGET_BRANCH"
-        # Implementation will be added in Phase 5
-        echo "Deploy action placeholder"
+        set -euo pipefail
+
+        if [ ! -d "$SOURCE_DIR" ]; then
+          echo "::error::Source directory '$SOURCE_DIR' does not exist"
+          exit 1
+        fi
+
+        REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git"
+        WORK_DIR=$(mktemp -d)
+
+        git config --global user.name "private-pages[bot]"
+        git config --global user.email "private-pages[bot]@users.noreply.github.com"
+
+        # Clone or init the target branch
+        if git ls-remote --heads "$REPO_URL" "$TARGET_BRANCH" | grep -q "$TARGET_BRANCH"; then
+          git clone --depth 1 --branch "$TARGET_BRANCH" "$REPO_URL" "$WORK_DIR"
+        else
+          git init "$WORK_DIR"
+          cd "$WORK_DIR"
+          git remote add origin "$REPO_URL"
+          git checkout --orphan "$TARGET_BRANCH"
+        fi
+
+        cd "$WORK_DIR"
+
+        # Remove old files (except .git)
+        find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
+
+        # Copy new files
+        cp -r "${GITHUB_WORKSPACE}/${SOURCE_DIR}/"* .
+
+        # Commit and push
+        git add -A
+        if git diff --cached --quiet; then
+          echo "No changes to deploy"
+        else
+          git commit -m "deploy: update from ${GITHUB_SHA:0:7}"
+          git push origin "$TARGET_BRANCH"
+          echo "Deployed successfully to ${TARGET_REPO}@${TARGET_BRANCH}"
+        fi
+
+        rm -rf "$WORK_DIR"

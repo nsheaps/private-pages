@@ -14,12 +14,63 @@ runs:
   using: 'composite'
   steps:
     - name: Deploy preview
+      if: github.event.action != 'closed'
       shell: bash
       env:
         SOURCE_DIR: ${{ inputs.source-directory }}
         GITHUB_TOKEN: ${{ inputs.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        TARGET_REPO: ${{ github.repository }}
       run: |
-        echo "Deploying preview for PR #$PR_NUMBER"
-        # Implementation will be added in Phase 5
-        echo "Preview deploy action placeholder"
+        set -euo pipefail
+
+        PREVIEW_BRANCH="preview/pr-${PR_NUMBER}"
+        REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git"
+        WORK_DIR=$(mktemp -d)
+
+        git config --global user.name "private-pages[bot]"
+        git config --global user.email "private-pages[bot]@users.noreply.github.com"
+
+        if git ls-remote --heads "$REPO_URL" "$PREVIEW_BRANCH" | grep -q "$PREVIEW_BRANCH"; then
+          git clone --depth 1 --branch "$PREVIEW_BRANCH" "$REPO_URL" "$WORK_DIR"
+        else
+          git init "$WORK_DIR"
+          cd "$WORK_DIR"
+          git remote add origin "$REPO_URL"
+          git checkout --orphan "$PREVIEW_BRANCH"
+        fi
+
+        cd "$WORK_DIR"
+        find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
+        cp -r "${GITHUB_WORKSPACE}/${SOURCE_DIR}/"* .
+
+        git add -A
+        if git diff --cached --quiet; then
+          echo "No changes to deploy"
+        else
+          git commit -m "preview: update PR #${PR_NUMBER} from ${GITHUB_SHA:0:7}"
+          git push origin "$PREVIEW_BRANCH"
+          echo "Preview deployed to ${PREVIEW_BRANCH}"
+        fi
+
+        rm -rf "$WORK_DIR"
+
+    - name: Cleanup preview
+      if: github.event.action == 'closed'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        TARGET_REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+
+        PREVIEW_BRANCH="preview/pr-${PR_NUMBER}"
+        REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git"
+
+        if git ls-remote --heads "$REPO_URL" "$PREVIEW_BRANCH" | grep -q "$PREVIEW_BRANCH"; then
+          git push "$REPO_URL" --delete "$PREVIEW_BRANCH"
+          echo "Cleaned up preview branch ${PREVIEW_BRANCH}"
+        else
+          echo "Preview branch ${PREVIEW_BRANCH} not found, nothing to clean up"
+        fi
