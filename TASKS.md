@@ -65,15 +65,15 @@
 
 ## Phase 4: Service Worker
 
-- [ ] T4.1: SW build pipeline (tsconfig.sw, vite.config.sw)
-- [ ] T4.2: SW router (match `/__pages__/**` pattern)
-- [ ] T4.3: SW OPFS reader (serve files from OPFS in SW context)
-- [ ] T4.4: Main sw.ts (install, activate, fetch handler)
+- [x] T4.1: SW build pipeline (tsconfig.sw, vite.config.sw)
+- [x] T4.2: SW router (match `/__pages__/**` pattern)
+- [x] T4.3: SW OPFS reader (serve files from OPFS in SW context)
+- [x] T4.4: Main sw.ts (install, activate, fetch handler)
 - [ ] T4.5: Background sync (check for new commits)
-- [ ] T4.6: SW registration in App
-- [ ] T4.7: UpdateBanner component
-- [ ] T4.8: PageRenderer SW detection + fallback
-- [ ] T4.9: Tests
+- [x] T4.6: SW registration in App
+- [x] T4.7: UpdateBanner component
+- [x] T4.8: PageRenderer SW detection + fallback
+- [x] T4.9: Tests
 - [ ] T4.10: BDD feature file
 
 ## Phase 5: GitHub Actions
