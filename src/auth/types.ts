@@ -24,6 +24,14 @@ export interface AuthProvider {
   logout(): Promise<void>;
 }
 
+export interface DeviceFlowState {
+  status: 'idle' | 'polling' | 'success' | 'error';
+  userCode?: string;
+  verificationUri?: string;
+  expiresAt?: number;
+  error?: string;
+}
+
 export interface StoredAuth {
   encryptedToken: ArrayBuffer;
   iv: Uint8Array;

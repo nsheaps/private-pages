@@ -13,7 +13,36 @@ vi.mock('../config/loader', () => ({
   },
 }));
 
+vi.mock('../auth/device-flow', () => ({
+  DeviceFlowProvider: vi.fn().mockImplementation(() => ({
+    login: vi.fn(),
+    validateToken: vi.fn(),
+    logout: vi.fn(),
+    loadStoredToken: vi.fn().mockResolvedValue(null),
+    cancelLogin: vi.fn(),
+  })),
+  AuthError: class AuthError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'AuthError';
+    }
+  },
+}));
+
 const mockLoadConfig = vi.mocked(loadConfig);
+
+const testConfig = {
+  github: { clientId: 'Iv1.test', authMode: 'device-flow' as const },
+  sites: [
+    {
+      path: '/',
+      repo: 'org/repo',
+      branch: 'main',
+      directory: '/',
+      fetchTtlSeconds: 60,
+    },
+  ],
+};
 
 describe('App', () => {
   beforeEach(() => {
@@ -26,19 +55,8 @@ describe('App', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('shows login screen after config loads', async () => {
-    mockLoadConfig.mockResolvedValue({
-      github: { clientId: 'Iv1.test', authMode: 'device-flow' as const },
-      sites: [
-        {
-          path: '/',
-          repo: 'org/repo',
-          branch: 'main',
-          directory: '/',
-          fetchTtlSeconds: 60,
-        },
-      ],
-    });
+  it('shows login screen after config loads and no stored token', async () => {
+    mockLoadConfig.mockResolvedValue(testConfig);
     render(<App />);
     await waitFor(() => {
       expect(

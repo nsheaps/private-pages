@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RouterProvider } from './Router';
 import { loadConfig, ConfigError } from '../config/loader';
+import { DeviceFlowProvider } from '../auth/device-flow';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { LoginScreen } from '../ui/LoginScreen';
+import { DeviceFlowScreen } from '../ui/DeviceFlowScreen';
 import type { ValidatedConfig } from '../config/schema';
+import type { DeviceFlowState, TokenInfo, UserInfo } from '../auth/types';
 
 type AppState =
   | { phase: 'loading-config' }
   | { phase: 'config-error'; message: string }
+  | { phase: 'checking-auth'; config: ValidatedConfig }
   | { phase: 'login'; config: ValidatedConfig }
-  | { phase: 'ready'; config: ValidatedConfig };
+  | { phase: 'device-flow'; config: ValidatedConfig }
+  | { phase: 'ready'; config: ValidatedConfig; token: TokenInfo; user: UserInfo };
 
 export function App() {
   const [state, setState] = useState<AppState>({ phase: 'loading-config' });
@@ -19,8 +24,7 @@ export function App() {
   useEffect(() => {
     loadConfig()
       .then((config) => {
-        // TODO: Check for stored token -> skip to 'ready'
-        setState({ phase: 'login', config });
+        setState({ phase: 'checking-auth', config });
       })
       .catch((err: unknown) => {
         const message =
@@ -40,6 +44,13 @@ export function App() {
   );
 }
 
+function getConfig(state: AppState): ValidatedConfig | null {
+  if (state.phase === 'loading-config' || state.phase === 'config-error') {
+    return null;
+  }
+  return state.config;
+}
+
 function AppContent({
   state,
   setState,
@@ -47,9 +58,75 @@ function AppContent({
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
 }) {
+  const [deviceFlowState, setDeviceFlowState] = useState<DeviceFlowState>({
+    status: 'idle',
+  });
+  const [loginError, setLoginError] = useState<string>();
+
+  const config = getConfig(state);
+  const clientId = config?.github.clientId ?? null;
+
+  const authProvider = useMemo(() => {
+    if (!clientId) return null;
+    return new DeviceFlowProvider(clientId);
+  }, [clientId]);
+
+  // Check for stored token on config load
+  useEffect(() => {
+    if (state.phase !== 'checking-auth' || !authProvider || !config) return;
+    const currentConfig = config;
+    authProvider
+      .loadStoredToken()
+      .then((stored) => {
+        if (stored) {
+          setState({
+            phase: 'ready',
+            config: currentConfig,
+            token: stored.token,
+            user: stored.user,
+          });
+        } else {
+          setState({ phase: 'login', config: currentConfig });
+        }
+      })
+      .catch(() => {
+        setState({ phase: 'login', config: currentConfig });
+      });
+  }, [state.phase, config, authProvider, setState]);
+
+  const startLogin = useCallback(() => {
+    if (!authProvider || !config) return;
+    const currentConfig = config;
+
+    setState({ phase: 'device-flow', config: currentConfig });
+    setLoginError(undefined);
+
+    authProvider
+      .login((flowState) => setDeviceFlowState(flowState))
+      .then((token) => {
+        return authProvider.loadStoredToken().then((stored) => {
+          if (stored) {
+            setState({
+              phase: 'ready',
+              config: currentConfig,
+              token,
+              user: stored.user,
+            });
+          }
+        });
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        setLoginError(message);
+        setDeviceFlowState({ status: 'error', error: message });
+        setState({ phase: 'login', config: currentConfig });
+      });
+  }, [config, authProvider, setState]);
+
   switch (state.phase) {
     case 'loading-config':
-      return <LoadingScreen message="Loading configuration..." />;
+    case 'checking-auth':
+      return <LoadingScreen message="Loading..." />;
 
     case 'config-error':
       return (
@@ -59,7 +136,7 @@ function AppContent({
           onRetry={() => {
             setState({ phase: 'loading-config' });
             loadConfig()
-              .then((config) => setState({ phase: 'login', config }))
+              .then((c) => setState({ phase: 'checking-auth', config: c }))
               .catch((err: unknown) =>
                 setState({
                   phase: 'config-error',
@@ -76,9 +153,21 @@ function AppContent({
     case 'login':
       return (
         <LoginScreen
-          onLogin={() => {
-            // TODO: Trigger OAuth flow
-            setState({ phase: 'ready', config: state.config });
+          onLogin={startLogin}
+          error={loginError}
+        />
+      );
+
+    case 'device-flow':
+      return (
+        <DeviceFlowScreen
+          state={deviceFlowState}
+          onCancel={() => {
+            authProvider?.cancelLogin();
+            if (config) {
+              setState({ phase: 'login', config });
+            }
+            setDeviceFlowState({ status: 'idle' });
           }}
         />
       );
@@ -86,8 +175,7 @@ function AppContent({
     case 'ready':
       return (
         <div id="private-pages-app">
-          <h1>Private Pages</h1>
-          <p>Authenticated. Content rendering not yet implemented.</p>
+          <p>Signed in as {state.user.login}. Content rendering not yet implemented.</p>
         </div>
       );
   }

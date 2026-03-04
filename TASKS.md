@@ -26,14 +26,14 @@
 
 ## Phase 1: Authentication
 
-- [ ] T1.1: AuthProvider interface + types
-- [ ] T1.2: Device flow implementation
-- [ ] T1.3: Token encryption + IndexedDB storage
+- [x] T1.1: AuthProvider interface + types
+- [x] T1.2: Device flow implementation
+- [x] T1.3: Token encryption + IndexedDB storage
 - [ ] T1.4: PKCE flow alternative
-- [ ] T1.5: IndexedDB wrapper (repos, auth, metadata stores)
-- [ ] T1.6: Wire auth into App (stored token → validate → site or login)
-- [ ] T1.7: DeviceFlowScreen UI component
-- [ ] T1.8: Tests + BDD feature file
+- [x] T1.5: IndexedDB wrapper (repos, auth, metadata stores)
+- [x] T1.6: Wire auth into App (stored token → validate → site or login)
+- [x] T1.7: DeviceFlowScreen UI component
+- [x] T1.8: Tests + BDD feature file
 
 ## Phase 2: Git Clone & OPFS Storage
 
