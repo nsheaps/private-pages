@@ -69,9 +69,10 @@ describe('PkceFlowProvider', () => {
       const result = await Promise.race([loginPromise, timeoutPromise]);
       expect(result).toBe('timeout');
 
-      // Verify PKCE state was stored in sessionStorage
+      // Verify PKCE state and return URL were stored in sessionStorage
       expect(sessionStorage.getItem('pp_pkce_verifier')).toBeTruthy();
       expect(sessionStorage.getItem('pp_pkce_state')).toBeTruthy();
+      expect(sessionStorage.getItem('pp_pkce_return_url')).toBeTruthy();
     });
   });
 

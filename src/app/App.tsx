@@ -25,26 +25,13 @@ type AppState =
   | { phase: 'ready'; config: ValidatedConfig; token: TokenInfo; user: UserInfo };
 
 /**
- * Determine the effective auth mode:
- * - If PKCE is configured and the current URL matches the callbackUrl, use PKCE
- * - Otherwise, fall back to device-flow
+ * Determine the effective auth mode from config.
+ * Defaults to PKCE. When a callbackUrl is configured it points to a shared
+ * /auth/callback route that redirects back to the originating deployment,
+ * so a URL mismatch is expected and does NOT trigger a device-flow fallback.
  */
 function resolveAuthMode(config: ValidatedConfig): 'pkce' | 'device-flow' {
-  if (config.github.authMode === 'device-flow') return 'device-flow';
-
-  // PKCE: check if callback URL matches current location
-  const callbackUrl = config.github.callbackUrl;
-  if (callbackUrl) {
-    const current = window.location.origin + window.location.pathname;
-    // Normalize trailing slashes for comparison
-    const normalize = (u: string) => u.replace(/\/+$/, '');
-    if (normalize(current) !== normalize(callbackUrl)) {
-      // Current URL doesn't match registered callback — device flow fallback
-      return 'device-flow';
-    }
-  }
-  // If no callbackUrl configured, PKCE uses current URL as redirect_uri
-  return 'pkce';
+  return config.github.authMode;
 }
 
 function createAuthProvider(config: ValidatedConfig): AuthProvider {

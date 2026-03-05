@@ -63,6 +63,7 @@ export class PkceFlowProvider implements AuthProvider {
 
     sessionStorage.setItem('pp_pkce_verifier', verifier);
     sessionStorage.setItem('pp_pkce_state', state);
+    sessionStorage.setItem('pp_pkce_return_url', window.location.origin + window.location.pathname);
 
     const authorizeUrl = new URL(GITHUB_AUTHORIZE_URL);
     authorizeUrl.searchParams.set('client_id', this.clientId);
