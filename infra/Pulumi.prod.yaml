@@ -1,3 +1,0 @@
-config:
-  private-pages-infra:workerName: private-pages-cors-proxy
-  private-pages-infra:allowedOrigins: "https://nsheaps.github.io"
