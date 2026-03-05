@@ -25,7 +25,7 @@ interface SiteViewProps {
 type ViewState =
   | { phase: 'cloning'; siteConfig: SiteConfig }
   | { phase: 'clone-error'; siteConfig: SiteConfig; error: string }
-  | { phase: 'rendering'; siteConfig: SiteConfig; repoState: RepoState }
+  | { phase: 'rendering'; siteConfig: SiteConfig; repoState: RepoState | null }
   | { phase: 'render-error'; siteConfig: SiteConfig; error: string }
   | { phase: 'not-found'; siteConfig: SiteConfig };
 
@@ -72,10 +72,12 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
         setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: state });
         setSyncStatus('idle');
       })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Clone failed';
-        setViewState({ phase: 'clone-error', siteConfig: matchedSite, error: message });
-        setSyncStatus('error');
+      .catch(() => {
+        // Clone/fetch failed (CORS proxy issue, network error, etc.)
+        // Fall back to API-only rendering — the FallbackContentFetcher
+        // will use the GitHub API which has native CORS support.
+        setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: null });
+        setSyncStatus('idle');
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depend on repo/branch only
   }, [matchedSite?.repo, matchedSite?.branch, token.accessToken]);
@@ -220,16 +222,15 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
               onProgress: setCloneProgress,
             });
             client
-              .cloneOrFetch(0) // Force refresh
+              .cloneOrFetch(0)
               .then((state) => {
                 setRepoState(state);
                 setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: state });
                 setSyncStatus('idle');
               })
-              .catch((err: unknown) => {
-                const message = err instanceof Error ? err.message : 'Clone failed';
-                setViewState({ phase: 'clone-error', siteConfig: matchedSite, error: message });
-                setSyncStatus('error');
+              .catch(() => {
+                setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: null });
+                setSyncStatus('idle');
               });
           }}
         />
