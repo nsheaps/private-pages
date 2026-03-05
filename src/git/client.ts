@@ -1,7 +1,6 @@
 import git from 'isomorphic-git';
-import http from 'isomorphic-git/http/web';
 import { createOpfsFs, type OpfsFs } from './opfs-fs';
-import { createAuthHelper } from './auth-helper';
+import { createAuthenticatedHttp } from './auth-helper';
 import { getRepoDir } from '../storage/opfs';
 import { getRepoMetadata, setRepoMetadata } from '../storage/idb';
 import type { CloneProgress, RepoState } from './types';
@@ -135,7 +134,7 @@ export class GitClient {
     try {
       return await this.withLock(async () => {
         const fs = await this.ensureFs();
-        const { onAuth } = createAuthHelper(this.token);
+        const http = createAuthenticatedHttp(this.token);
 
         await git.clone({
           fs,
@@ -147,7 +146,6 @@ export class GitClient {
           singleBranch: true,
           depth: 1,
           noCheckout: true,
-          onAuth,
           onProgress: this.onProgress
             ? (event) => {
                 this.onProgress!({
@@ -191,7 +189,7 @@ export class GitClient {
     try {
       return await this.withLock(async () => {
         const fs = await this.ensureFs();
-        const { onAuth } = createAuthHelper(this.token);
+        const http = createAuthenticatedHttp(this.token);
 
         await git.fetch({
           fs,
@@ -201,7 +199,6 @@ export class GitClient {
           ref: this.branch,
           corsProxy: this.corsProxy,
           singleBranch: true,
-          onAuth,
           onProgress: this.onProgress
             ? (event) => {
                 this.onProgress!({
