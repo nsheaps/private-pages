@@ -29,33 +29,84 @@
     <p id="error" class="error" hidden></p>
   </div>
   <script>
-    (function () {
+    (async function () {
       var params = new URLSearchParams(window.location.search);
       var code = params.get('code');
-      var state = params.get('state');
+      var returnedState = params.get('state');
 
-      if (!code || !state) {
+      if (!code || !returnedState) {
         showError('Missing code or state parameter. Please try signing in again.');
         return;
       }
 
+      var storedState = sessionStorage.getItem('pp_pkce_state');
+      var verifier = sessionStorage.getItem('pp_pkce_verifier');
+      var clientId = sessionStorage.getItem('pp_pkce_client_id');
+      var redirectUri = sessionStorage.getItem('pp_pkce_redirect_uri');
       var returnUrl = sessionStorage.getItem('pp_pkce_return_url');
-      if (!returnUrl) {
+
+      if (!storedState || !verifier || !clientId || !returnUrl) {
         showError(
-          'Could not determine where to redirect. ' +
-          'This can happen if you opened this link in a different tab. ' +
-          'Please return to the app and try signing in again.'
+          'Missing session data. This can happen if you opened this link ' +
+          'in a different tab. Please return to the app and try signing in again.'
         );
         return;
       }
 
+      if (returnedState !== storedState) {
+        showError('State mismatch. Please try signing in again.');
+        return;
+      }
+
+      // Exchange the authorization code for an access token
+      try {
+        var body = new URLSearchParams({
+          client_id: clientId,
+          code: code,
+          code_verifier: verifier,
+        });
+        if (redirectUri) {
+          body.set('redirect_uri', redirectUri);
+        }
+
+        var response = await fetch('https://github.com/login/oauth/access_token', {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          body: body,
+        });
+
+        if (!response.ok) {
+          showError('Token exchange failed: ' + response.status + ' ' + response.statusText);
+          return;
+        }
+
+        var data = await response.json();
+
+        if (data.error) {
+          showError(data.error_description || ('Token exchange error: ' + data.error));
+          return;
+        }
+
+        // Store the token result for the app to pick up
+        sessionStorage.setItem('pp_pkce_token_result', JSON.stringify({
+          access_token: data.access_token,
+          token_type: data.token_type,
+          scope: data.scope,
+        }));
+      } catch (err) {
+        showError('Token exchange failed: ' + (err.message || 'network error'));
+        return;
+      }
+
+      // Clean up PKCE session data
+      sessionStorage.removeItem('pp_pkce_state');
+      sessionStorage.removeItem('pp_pkce_verifier');
+      sessionStorage.removeItem('pp_pkce_client_id');
+      sessionStorage.removeItem('pp_pkce_redirect_uri');
       sessionStorage.removeItem('pp_pkce_return_url');
 
-      // Redirect back to the originating deployment with code and state
-      var target = new URL(returnUrl);
-      target.searchParams.set('code', code);
-      target.searchParams.set('state', state);
-      window.location.replace(target.toString());
+      // Redirect back to the originating deployment
+      window.location.replace(returnUrl);
 
       function showError(msg) {
         document.getElementById('status').hidden = true;
