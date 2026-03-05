@@ -127,18 +127,19 @@ export class PkceFlowProvider implements AuthProvider {
     code: string,
     verifier: string,
   ): Promise<TokenInfo> {
+    const body = new URLSearchParams({
+      client_id: this.clientId,
+      code,
+      code_verifier: verifier,
+      redirect_uri: this.redirectUri,
+    });
+
     const response = await fetch(this.proxyUrl(GITHUB_TOKEN_URL), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        client_id: this.clientId,
-        code,
-        code_verifier: verifier,
-        redirect_uri: this.redirectUri,
-      }),
+      body,
     });
 
     if (!response.ok) {

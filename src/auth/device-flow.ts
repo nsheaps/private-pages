@@ -109,16 +109,17 @@ export class DeviceFlowProvider implements AuthProvider {
   }
 
   private async requestDeviceCode(): Promise<DeviceCodeResponse> {
+    const body = new URLSearchParams({
+      client_id: this.clientId,
+      scope: this.scope,
+    });
+
     const response = await fetch(this.proxyUrl(GITHUB_DEVICE_CODE_URL), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        client_id: this.clientId,
-        scope: this.scope,
-      }),
+      body,
       signal: this.abortController?.signal,
     });
 
@@ -146,17 +147,18 @@ export class DeviceFlowProvider implements AuthProvider {
 
       await sleep(pollInterval);
 
+      const body = new URLSearchParams({
+        client_id: this.clientId,
+        device_code: deviceCode,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      });
+
       const response = await fetch(this.proxyUrl(GITHUB_TOKEN_URL), {
         method: 'POST',
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          client_id: this.clientId,
-          device_code: deviceCode,
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        }),
+        body,
         signal: this.abortController?.signal,
       });
 
