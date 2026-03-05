@@ -326,6 +326,7 @@ function AppContent({
           deviceFlowState={deviceFlowState}
           onDeviceFlowCancel={cancelDeviceFlow}
           availableMethods={wizardMethods}
+          hasCorsProxy={Boolean(config?.github.corsProxy)}
         />
       );
 
