@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { DeviceFlowState } from '../../auth/types';
 import type { WizardState, WizardStep, HelpTopic, DirectUrlCredentialMode } from './types';
 import { ChooseMethodStep } from './ChooseMethodStep';
@@ -74,7 +74,8 @@ export function LoginWizard({
   const initialStep = hashToStep() ?? 'choose-method';
   const [state, setState] = useState<WizardState>({ step: initialStep });
   const [slideDirection, setSlideDirection] = useState<'none' | 'forward' | 'back'>('none');
-
+  const currentStepRef = useRef(state.step);
+  currentStepRef.current = state.step;
 
   const methods = availableMethods ?? {
     pat: true,
@@ -98,7 +99,9 @@ export function LoginWizard({
     function onPopState(event: PopStateEvent) {
       const step = event.state?.wizardStep;
       if (isWizardStep(step)) {
-        setSlideDirection('back');
+        // Returning from or to help shouldn't slide — it's not a wizard step
+        const isHelpTransition = step === 'help' || currentStepRef.current === 'help';
+        setSlideDirection(isHelpTransition ? 'none' : 'back');
         setState((prev) => {
           if (step === 'choose-method') {
             return { ...prev, step, error: undefined, helpTopic: undefined };
@@ -109,7 +112,7 @@ export function LoginWizard({
         // Try parsing from hash as fallback
         const fromHash = hashToStep();
         const target = fromHash ?? 'choose-method';
-        setSlideDirection('back');
+        setSlideDirection('none');
         setState((prev) => ({ ...prev, step: target, error: undefined, helpTopic: undefined }));
       }
     }
@@ -145,10 +148,17 @@ export function LoginWizard({
   }, []);
 
   const showHelp = useCallback((topic: HelpTopic) => {
-    navigateTo('help', state.step);
-    pushStep('help');
-    setState((prev) => ({ ...prev, step: 'help', helpTopic: topic }));
-  }, [navigateTo, state.step, pushStep]);
+    // Help is an overlay — no slide animation, and replaceState so repeated
+    // clicks don't stack history entries (back always returns to the previous step).
+    setSlideDirection('none');
+    if (state.step === 'help') {
+      // Already on help — just switch topic, keep same history entry
+      setState((prev) => ({ ...prev, helpTopic: topic }));
+    } else {
+      window.history.pushState({ wizardStep: 'help' }, '', stepToHash('help'));
+      setState((prev) => ({ ...prev, step: 'help', helpTopic: topic }));
+    }
+  }, [state.step]);
 
   const handleDirectUrlSubmit = useCallback((url: string) => {
     setState((prev) => ({ ...prev, repoUrl: url, loading: true }));
