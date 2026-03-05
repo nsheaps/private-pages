@@ -45,7 +45,7 @@ vi.mock('../auth/pat-flow', () => ({
 const mockLoadConfig = vi.mocked(loadConfig);
 
 const testConfig = {
-  github: { clientId: 'Iv1.test', authMode: 'device-flow' as const },
+  github: { clientId: 'Iv1.test', authMode: 'device-flow' as const, corsProxy: 'https://cors.isomorphic-git.org' },
   sites: [
     {
       path: '/',

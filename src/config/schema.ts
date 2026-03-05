@@ -12,7 +12,7 @@ export const GithubConfigSchema = z.object({
   clientId: z.string(),
   authMode: z.enum(['pkce', 'device-flow', 'pat']).default('pat'),
   callbackUrl: z.string().url().optional(),
-  corsProxy: z.string().url().optional(),
+  corsProxy: z.string().url().default('https://cors.isomorphic-git.org'),
 });
 
 export const ConfigSchema = z.object({
