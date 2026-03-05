@@ -39,21 +39,36 @@ describe('ConfigSchema', () => {
     const result = ConfigSchema.safeParse(config);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.github.authMode).toBe('device-flow');
+      expect(result.data.github.authMode).toBe('pat');
       expect(result.data.sites[0]?.branch).toBe('main');
       expect(result.data.sites[0]?.directory).toBe('/');
       expect(result.data.sites[0]?.fetchTtlSeconds).toBe(60);
     }
   });
 
-  it('rejects config with no sites', () => {
+  it('accepts config with no sites (dynamic repo mode)', () => {
     const config = {
       github: { clientId: 'Iv1.abc123' },
       sites: [],
     };
 
     const result = ConfigSchema.safeParse(config);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sites).toEqual([]);
+    }
+  });
+
+  it('accepts config with sites omitted (defaults to empty)', () => {
+    const config = {
+      github: { clientId: 'Iv1.abc123' },
+    };
+
+    const result = ConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sites).toEqual([]);
+    }
   });
 
   it('rejects invalid repo format', () => {

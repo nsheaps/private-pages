@@ -10,13 +10,15 @@ export const SiteConfigSchema = z.object({
 
 export const GithubConfigSchema = z.object({
   clientId: z.string(),
-  authMode: z.enum(['pkce', 'device-flow']).default('device-flow'),
+  authMode: z.enum(['pkce', 'device-flow', 'pat']).default('pat'),
+  callbackUrl: z.string().url().optional(),
   corsProxy: z.string().url().optional(),
 });
 
 export const ConfigSchema = z.object({
   github: GithubConfigSchema,
-  sites: z.array(SiteConfigSchema).min(1),
+  sites: z.array(SiteConfigSchema).default([]),
 });
 
 export type ValidatedConfig = z.infer<typeof ConfigSchema>;
+export type SiteConfig = z.infer<typeof SiteConfigSchema>;

@@ -21,7 +21,16 @@ export type AuthState =
 export interface AuthProvider {
   login(): Promise<TokenInfo>;
   validateToken(token: TokenInfo): Promise<boolean>;
+  loadStoredToken(): Promise<{ token: TokenInfo; user: UserInfo } | null>;
   logout(): Promise<void>;
+}
+
+export interface DeviceFlowState {
+  status: 'idle' | 'polling' | 'success' | 'error';
+  userCode?: string;
+  verificationUri?: string;
+  expiresAt?: number;
+  error?: string;
 }
 
 export interface StoredAuth {

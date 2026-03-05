@@ -1,7 +1,23 @@
 {
   "name": "private-pages",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nsheaps/private-pages.git"
+  },
+  "keywords": [
+    "github-pages",
+    "private-repos",
+    "static-site",
+    "isomorphic-git",
+    "opfs",
+    "service-worker"
+  ],
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "description": "Client-only GitHub Pages for private repos — authenticate via GitHub OAuth, clone with isomorphic-git into OPFS, render static sites in the browser",
   "scripts": {

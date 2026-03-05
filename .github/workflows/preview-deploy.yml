@@ -44,8 +44,13 @@ jobs:
           mkdir -p "${DEPLOY_DIR}"
           cp -r dist/* "${DEPLOY_DIR}/"
 
+          # Deploy shared auth callback page to the gh-pages root
+          # so it's available at /private-pages/auth/callback/ for all deployments
+          mkdir -p auth/callback
+          cp dist/auth/callback/index.html auth/callback/index.html
+
           # Commit and push
-          git add "${DEPLOY_DIR}"
+          git add "${DEPLOY_DIR}" auth/callback
           git commit -m "Deploy preview for PR #${PR_NUMBER}" --allow-empty
           git push origin gh-pages
 
