@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Private Pages - Auth Callback</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+    .container {
+      text-align: center;
+      max-width: 480px;
+      padding: 2rem;
+    }
+    .error { color: #f85149; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p id="status">Completing sign-in&hellip;</p>
+    <p id="error" class="error" hidden></p>
+  </div>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var code = params.get('code');
+      var state = params.get('state');
+
+      if (!code || !state) {
+        showError('Missing code or state parameter. Please try signing in again.');
+        return;
+      }
+
+      var returnUrl = sessionStorage.getItem('pp_pkce_return_url');
+      if (!returnUrl) {
+        showError(
+          'Could not determine where to redirect. ' +
+          'This can happen if you opened this link in a different tab. ' +
+          'Please return to the app and try signing in again.'
+        );
+        return;
+      }
+
+      sessionStorage.removeItem('pp_pkce_return_url');
+
+      // Redirect back to the originating deployment with code and state
+      var target = new URL(returnUrl);
+      target.searchParams.set('code', code);
+      target.searchParams.set('state', state);
+      window.location.replace(target.toString());
+
+      function showError(msg) {
+        document.getElementById('status').hidden = true;
+        var el = document.getElementById('error');
+        el.textContent = msg;
+        el.hidden = false;
+      }
+    })();
+  </script>
+</body>
+</html>

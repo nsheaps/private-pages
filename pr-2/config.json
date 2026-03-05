@@ -1,6 +1,6 @@
 {
   "github": {
     "clientId": "Iv23li66Cc2ItIASzjfJ",
-    "callbackUrl": "https://nsheaps.github.io/private-pages/app/"
+    "callbackUrl": "https://nsheaps.github.io/private-pages/auth/callback/"
   }
 }
