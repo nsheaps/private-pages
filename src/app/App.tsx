@@ -87,7 +87,7 @@ function createProviders(config: ValidatedConfig) {
   return {
     pat: new PatFlowProvider(),
     pkce: hasClientId
-      ? new PkceFlowProvider(config.github.clientId, 'repo', config.github.callbackUrl)
+      ? new PkceFlowProvider(config.github.clientId, 'repo', config.github.callbackUrl, config.github.corsProxy)
       : null,
     deviceFlow: hasClientId
       ? new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy)
