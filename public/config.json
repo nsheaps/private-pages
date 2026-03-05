@@ -1,6 +1,7 @@
 {
   "github": {
     "clientId": "Iv23li66Cc2ItIASzjfJ",
-    "callbackUrl": "https://nsheaps.github.io/private-pages/auth/callback/"
+    "callbackUrl": "https://nsheaps.github.io/private-pages/auth/callback/",
+    "corsProxy": "https://private-pages-cors-proxy.<your-cf-subdomain>.workers.dev"
   }
 }
