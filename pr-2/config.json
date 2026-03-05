@@ -1,6 +1,7 @@
 {
   "github": {
     "clientId": "Iv23li66Cc2ItIASzjfJ",
+    "authMode": "device-flow",
     "callbackUrl": "https://nsheaps.github.io/private-pages/auth/callback/"
   }
 }
