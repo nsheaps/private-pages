@@ -1,0 +1,88 @@
+name: 'CD: Infrastructure'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - 'workers/cors-proxy/**'
+      - '.github/workflows/cd-infra.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - 'workers/cors-proxy/**'
+      - '.github/workflows/cd-infra.yml'
+
+concurrency:
+  group: cd-infra-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: infra
+
+jobs:
+  preview:
+    name: Pulumi Preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Install worker dependencies & build
+        working-directory: workers/cors-proxy
+        run: npm ci && npm run build
+
+      - name: Install infra dependencies
+        run: npm ci
+
+      - name: Pulumi Preview
+        uses: pulumi/actions@v6
+        with:
+          command: preview
+          stack-name: prod
+          work-dir: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          # 1Password service account injects Cloudflare credentials
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  deploy:
+    name: Pulumi Up
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Install worker dependencies & build
+        working-directory: workers/cors-proxy
+        run: npm ci && npm run build
+
+      - name: Install infra dependencies
+        run: npm ci
+
+      - name: Pulumi Up
+        uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: prod
+          work-dir: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

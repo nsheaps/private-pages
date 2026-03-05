@@ -1,0 +1,10 @@
+name: private-pages-infra
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm
+description: Infrastructure for private-pages Cloudflare Worker (CORS proxy)
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: cloudflare-typescript

@@ -1,0 +1,7 @@
+name = "private-pages-cors-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# Uncomment and set in Pulumi or dashboard; not committed
+# [vars]
+# ALLOWED_ORIGINS = ""
