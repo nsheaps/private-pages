@@ -4,6 +4,7 @@ import { RouterProvider, useRouter } from './Router';
 import { loadConfig, ConfigError } from '../config/loader';
 import { PkceFlowProvider } from '../auth/pkce-flow';
 import { DeviceFlowProvider } from '../auth/device-flow';
+import { PatFlowProvider } from '../auth/pat-flow';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { LoginScreen } from '../ui/LoginScreen';
@@ -30,7 +31,7 @@ type AppState =
  * /auth/callback route that redirects back to the originating deployment,
  * so a URL mismatch is expected and does NOT trigger a device-flow fallback.
  */
-function resolveAuthMode(config: ValidatedConfig): 'pkce' | 'device-flow' {
+function resolveAuthMode(config: ValidatedConfig): 'pkce' | 'device-flow' | 'pat' {
   return config.github.authMode;
 }
 
@@ -43,7 +44,10 @@ function createAuthProvider(config: ValidatedConfig): AuthProvider {
       config.github.callbackUrl,
     );
   }
-  return new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy);
+  if (mode === 'device-flow') {
+    return new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy);
+  }
+  return new PatFlowProvider();
 }
 
 export function App() {
@@ -167,7 +171,6 @@ function AppContent({
     setLoginError(undefined);
 
     if (effectiveAuthMode === 'pkce') {
-      // PKCE: redirect to GitHub (leaves the page)
       authProvider.login().catch((err: unknown) => {
         const message = err instanceof Error ? err.message : 'Login failed';
         setLoginError(message);
@@ -176,29 +179,58 @@ function AppContent({
       return;
     }
 
-    // Device flow
-    setState({ phase: 'device-flow', config: currentConfig });
-    (authProvider as DeviceFlowProvider)
-      .login((flowState) => setDeviceFlowState(flowState))
-      .then((token) => {
+    if (effectiveAuthMode === 'device-flow') {
+      setState({ phase: 'device-flow', config: currentConfig });
+      (authProvider as DeviceFlowProvider)
+        .login((flowState) => setDeviceFlowState(flowState))
+        .then((token) => {
+          return authProvider.loadStoredToken().then((stored) => {
+            if (stored) {
+              setState({
+                phase: 'ready',
+                config: currentConfig,
+                token,
+                user: stored.user,
+              });
+            }
+          });
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Login failed';
+          setLoginError(message);
+          setDeviceFlowState({ status: 'error', error: message });
+          setState({ phase: 'login', config: currentConfig });
+        });
+      return;
+    }
+
+    // PAT mode — login() without a token just prompts; handled by startPatLogin
+  }, [config, authProvider, effectiveAuthMode, setState]);
+
+  const startPatLogin = useCallback((token: string) => {
+    if (!authProvider || !config) return;
+    const currentConfig = config;
+    setLoginError(undefined);
+
+    (authProvider as PatFlowProvider)
+      .login(token)
+      .then((tokenInfo) => {
         return authProvider.loadStoredToken().then((stored) => {
           if (stored) {
             setState({
               phase: 'ready',
               config: currentConfig,
-              token,
+              token: tokenInfo,
               user: stored.user,
             });
           }
         });
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Login failed';
+        const message = err instanceof Error ? err.message : 'Invalid token';
         setLoginError(message);
-        setDeviceFlowState({ status: 'error', error: message });
-        setState({ phase: 'login', config: currentConfig });
       });
-  }, [config, authProvider, effectiveAuthMode, setState]);
+  }, [config, authProvider, setState]);
 
   const handleLogout = useCallback(() => {
     if (!authProvider || !config) return;
@@ -253,6 +285,7 @@ function AppContent({
       return (
         <LoginScreen
           onLogin={startLogin}
+          onPatLogin={startPatLogin}
           error={loginError}
           authMode={effectiveAuthMode ?? undefined}
         />

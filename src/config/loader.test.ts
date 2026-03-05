@@ -32,7 +32,7 @@ describe('loadConfig', () => {
 
       expect(config).not.toBeNull();
       expect(config!.github.clientId).toBe('Iv1.abc');
-      expect(config!.github.authMode).toBe('pkce');
+      expect(config!.github.authMode).toBe('pat');
       expect(config!.sites[0]?.repo).toBe('org/repo');
       expect(config!.sites[0]?.branch).toBe('gh-pages');
       expect(config!.sites[0]?.directory).toBe('dist/');

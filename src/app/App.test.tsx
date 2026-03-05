@@ -33,6 +33,15 @@ vi.mock('../auth/pkce-flow', () => ({
   })),
 }));
 
+vi.mock('../auth/pat-flow', () => ({
+  PatFlowProvider: vi.fn().mockImplementation(() => ({
+    login: vi.fn(),
+    validateToken: vi.fn(),
+    logout: vi.fn(),
+    loadStoredToken: vi.fn().mockResolvedValue(null),
+  })),
+}));
+
 const mockLoadConfig = vi.mocked(loadConfig);
 
 const testConfig = {
