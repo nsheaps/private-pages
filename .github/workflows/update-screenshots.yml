@@ -1,0 +1,57 @@
+name: Update Documentation Screenshots
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: update-screenshots
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    name: Capture Screenshots
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate as GitHub App
+        id: auth
+        if: ${{ secrets.AUTOMATION_GITHUB_APP_ID != '' }}
+        uses: ./.github/actions/github-app-auth
+        with:
+          app-id: ${{ secrets.AUTOMATION_GITHUB_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run screenshot tests
+        run: npx playwright test test/e2e/screenshots.spec.ts
+
+      - name: Check for screenshot changes
+        id: changes
+        run: |
+          if [ -n "$(git diff --name-only docs/screenshots/)" ] || [ -n "$(git ls-files --others --exclude-standard docs/screenshots/)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated screenshots
+        if: steps.changes.outputs.changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: 'docs(ui): update login wizard screenshots'
+          file_pattern: 'docs/screenshots/*.png'

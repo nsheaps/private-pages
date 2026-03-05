@@ -390,3 +390,346 @@ body {
 .pp-logout-link:hover {
   color: #c9d1d9;
 }
+
+/* ============================
+   Login Wizard
+   ============================ */
+
+.pp-wizard-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.pp-wizard-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.pp-wizard-header h1 {
+  margin: 0.5rem 0;
+}
+
+.pp-wizard-header p {
+  color: #586069;
+  margin: 0.25rem 0;
+}
+
+.pp-wizard-back {
+  background: none;
+  border: none;
+  color: #0366d6;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0;
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.pp-wizard-back:hover {
+  text-decoration: underline;
+}
+
+/* Method selection cards */
+.pp-wizard-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.pp-wizard-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: 1px solid #d1d5da;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pp-wizard-option:hover {
+  border-color: #0366d6;
+  background: #f6f8fa;
+}
+
+.pp-wizard-option-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #24292e;
+}
+
+.pp-wizard-option-desc {
+  font-size: 0.85rem;
+  color: #586069;
+  margin-top: 0.25rem;
+}
+
+/* Wizard forms */
+.pp-wizard-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.pp-wizard-form label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.pp-wizard-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5da;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.pp-wizard-input:focus {
+  outline: none;
+  border-color: #0366d6;
+  box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+}
+
+.pp-wizard-input:disabled {
+  background: #f6f8fa;
+  color: #959da5;
+}
+
+/* Wizard buttons */
+.pp-wizard-button {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  border: 1px solid #d1d5da;
+  border-radius: 6px;
+  cursor: pointer;
+  background: white;
+  color: #24292e;
+  margin-top: 0.5rem;
+}
+
+.pp-wizard-button:hover {
+  background: #f6f8fa;
+}
+
+.pp-wizard-button-primary {
+  background: #24292e;
+  color: white;
+  border-color: #24292e;
+}
+
+.pp-wizard-button-primary:hover {
+  background: #444d56;
+}
+
+.pp-wizard-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pp-wizard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+/* Wizard footer */
+.pp-wizard-footer {
+  margin-top: 1rem;
+}
+
+.pp-link-button {
+  background: none;
+  border: none;
+  color: #0366d6;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.pp-link-button:hover {
+  color: #0256b9;
+}
+
+/* Wizard help section */
+.pp-wizard-help-section {
+  margin-top: 1rem;
+  text-align: center;
+  color: #586069;
+  font-size: 0.85rem;
+}
+
+.pp-wizard-help-section p {
+  margin: 0.25rem 0;
+}
+
+.pp-wizard-help-section a {
+  color: #0366d6;
+}
+
+/* Direct URL fallback */
+.pp-wizard-fallback {
+  width: 100%;
+  padding: 1rem;
+  background: #fffbdd;
+  border: 1px solid #e1d72e;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.pp-wizard-fallback p {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.pp-wizard-fallback-options {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+/* Credential mode tabs */
+.pp-wizard-mode-tabs {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.pp-wizard-tab {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5da;
+  background: #f6f8fa;
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.pp-wizard-tab:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.pp-wizard-tab:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.pp-wizard-tab-active {
+  background: white;
+  border-bottom-color: white;
+  font-weight: 600;
+  color: #0366d6;
+}
+
+/* Help page */
+.pp-wizard-help {
+  text-align: left;
+  align-items: stretch;
+}
+
+.pp-help-nav {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #e1e4e8;
+  overflow-x: auto;
+}
+
+.pp-help-nav-item {
+  padding: 0.5rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #586069;
+  white-space: nowrap;
+}
+
+.pp-help-nav-item:hover {
+  color: #24292e;
+}
+
+.pp-help-nav-active {
+  color: #0366d6;
+  border-bottom-color: #0366d6;
+  font-weight: 600;
+}
+
+.pp-help-content {
+  line-height: 1.6;
+}
+
+.pp-help-content h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.pp-help-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pp-help-content ol,
+.pp-help-content ul {
+  padding-left: 1.5rem;
+}
+
+.pp-help-content li {
+  margin-bottom: 0.25rem;
+}
+
+.pp-help-content code {
+  background: #f0f0f0;
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.pp-help-content a {
+  color: #0366d6;
+}
+
+.pp-help-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+
+.pp-help-table th,
+.pp-help-table td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e1e4e8;
+  text-align: left;
+}
+
+.pp-help-table th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+
+.pp-help-screenshot {
+  max-width: 100%;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  margin: 1rem 0;
+}

@@ -7,8 +7,7 @@ import { DeviceFlowProvider } from '../auth/device-flow';
 import { PatFlowProvider } from '../auth/pat-flow';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { LoadingScreen } from '../ui/LoadingScreen';
-import { LoginScreen } from '../ui/LoginScreen';
-import { DeviceFlowScreen } from '../ui/DeviceFlowScreen';
+import { LoginWizard } from '../ui/wizard';
 import { SetupPage } from '../ui/SetupPage';
 import { SiteLandingPage } from '../ui/SiteLandingPage';
 import { RepoPickerPage } from '../ui/RepoPickerPage';
@@ -23,6 +22,7 @@ type AppState =
   | { phase: 'checking-auth'; config: ValidatedConfig }
   | { phase: 'login'; config: ValidatedConfig }
   | { phase: 'device-flow'; config: ValidatedConfig }
+  | { phase: 'direct-url'; repoUrl: string; auth?: { token?: string; username?: string; password?: string } }
   | { phase: 'ready'; config: ValidatedConfig; token: TokenInfo; user: UserInfo };
 
 /**
@@ -84,7 +84,8 @@ function getConfig(state: AppState): ValidatedConfig | null {
   if (
     state.phase === 'loading-config' ||
     state.phase === 'config-error' ||
-    state.phase === 'no-config'
+    state.phase === 'no-config' ||
+    state.phase === 'direct-url'
   ) {
     return null;
   }
@@ -232,6 +233,10 @@ function AppContent({
       });
   }, [config, authProvider, setState]);
 
+  const startDirectUrlLogin = useCallback((url: string, auth?: { token?: string; username?: string; password?: string }) => {
+    setState({ phase: 'direct-url', repoUrl: url, auth });
+  }, [setState]);
+
   const handleLogout = useCallback(() => {
     if (!authProvider || !config) return;
     const currentConfig = config;
@@ -244,6 +249,20 @@ function AppContent({
         setState({ phase: 'login', config: currentConfig });
       });
   }, [authProvider, config, setState]);
+
+  // Determine which wizard methods are available based on config
+  const wizardMethods = useMemo(() => {
+    if (!config) {
+      return { pat: true, githubApp: false, deviceFlow: false, directUrl: true };
+    }
+    const mode = resolveAuthMode(config);
+    return {
+      pat: true,
+      githubApp: mode === 'pkce' || config.github.clientId !== '',
+      deviceFlow: mode === 'device-flow' || config.github.clientId !== '',
+      directUrl: true,
+    };
+  }, [config]);
 
   switch (state.phase) {
     case 'loading-config':
@@ -283,19 +302,33 @@ function AppContent({
 
     case 'login':
       return (
-        <LoginScreen
-          onLogin={startLogin}
+        <LoginWizard
           onPatLogin={startPatLogin}
+          onPkceLogin={startLogin}
+          onDeviceFlowLogin={startLogin}
+          onDirectUrlLogin={startDirectUrlLogin}
           error={loginError}
-          authMode={effectiveAuthMode ?? undefined}
+          deviceFlowState={deviceFlowState}
+          onDeviceFlowCancel={() => {
+            if (authProvider instanceof DeviceFlowProvider) {
+              authProvider.cancelLogin();
+            }
+            setDeviceFlowState({ status: 'idle' });
+          }}
+          availableMethods={wizardMethods}
         />
       );
 
     case 'device-flow':
       return (
-        <DeviceFlowScreen
-          state={deviceFlowState}
-          onCancel={() => {
+        <LoginWizard
+          onPatLogin={startPatLogin}
+          onPkceLogin={startLogin}
+          onDeviceFlowLogin={startLogin}
+          onDirectUrlLogin={startDirectUrlLogin}
+          error={loginError}
+          deviceFlowState={deviceFlowState}
+          onDeviceFlowCancel={() => {
             if (authProvider instanceof DeviceFlowProvider) {
               authProvider.cancelLogin();
             }
@@ -303,6 +336,22 @@ function AppContent({
               setState({ phase: 'login', config });
             }
             setDeviceFlowState({ status: 'idle' });
+          }}
+          availableMethods={wizardMethods}
+        />
+      );
+
+    case 'direct-url':
+      return (
+        <DirectUrlView
+          repoUrl={state.repoUrl}
+          auth={state.auth}
+          onBack={() => {
+            if (config) {
+              setState({ phase: 'login', config });
+            } else {
+              setState({ phase: 'no-config' });
+            }
           }}
         />
       );
@@ -317,6 +366,37 @@ function AppContent({
         />
       );
   }
+}
+
+/**
+ * Handles a direct-url clone attempt. Tries anonymous first, shows progress.
+ * For now, shows a loading state — the full git clone integration will come
+ * when the direct URL feature is connected to the git client.
+ */
+function DirectUrlView({
+  repoUrl,
+  auth,
+  onBack,
+}: {
+  repoUrl: string;
+  auth?: { token?: string; username?: string; password?: string };
+  onBack: () => void;
+}) {
+  return (
+    <div className="pp-wizard-screen" role="status">
+      <div className="pp-wizard-header">
+        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
+          &larr; Back
+        </button>
+        <h1>Connecting to Repository</h1>
+        <p>
+          Cloning <code>{repoUrl}</code>
+          {auth ? ' with provided credentials' : ' anonymously'}...
+        </p>
+      </div>
+      <LoadingScreen message="Connecting..." />
+    </div>
+  );
 }
 
 /**
