@@ -2,21 +2,15 @@ import type { HelpTopic } from './types';
 
 interface HelpPageProps {
   topic: HelpTopic;
-  onBack: () => void;
   onChooseTopic: (topic: HelpTopic) => void;
 }
 
 const SCREENSHOT_BASE = 'docs/screenshots';
 
-export function HelpPage({ topic, onBack, onChooseTopic }: HelpPageProps) {
+export function HelpPage({ topic, onChooseTopic }: HelpPageProps) {
   return (
     <div className="pp-wizard-screen pp-wizard-help" role="main" data-testid="wizard-help-page">
-      <div className="pp-wizard-header">
-        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
-          &larr; Back
-        </button>
-        <h1>Authentication Help</h1>
-      </div>
+      <h1>Authentication Help</h1>
 
       <nav className="pp-help-nav" aria-label="Help topics">
         <button

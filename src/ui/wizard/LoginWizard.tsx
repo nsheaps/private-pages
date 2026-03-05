@@ -268,7 +268,6 @@ export function LoginWizard({
         return (
           <HelpPage
             topic={state.helpTopic ?? 'overview'}
-            onBack={goBack}
             onChooseTopic={(topic) => setState((prev) => ({ ...prev, helpTopic: topic }))}
           />
         );
