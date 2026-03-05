@@ -7,8 +7,7 @@ import { DeviceFlowProvider } from '../auth/device-flow';
 import { PatFlowProvider } from '../auth/pat-flow';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { LoadingScreen } from '../ui/LoadingScreen';
-import { LoginScreen } from '../ui/LoginScreen';
-import { DeviceFlowScreen } from '../ui/DeviceFlowScreen';
+import { LoginWizard } from '../ui/wizard';
 import { SetupPage } from '../ui/SetupPage';
 import { SiteLandingPage } from '../ui/SiteLandingPage';
 import { RepoPickerPage } from '../ui/RepoPickerPage';
@@ -23,6 +22,7 @@ type AppState =
   | { phase: 'checking-auth'; config: ValidatedConfig }
   | { phase: 'login'; config: ValidatedConfig }
   | { phase: 'device-flow'; config: ValidatedConfig }
+  | { phase: 'direct-url'; repoUrl: string; auth?: { token?: string; username?: string; password?: string } }
   | { phase: 'ready'; config: ValidatedConfig; token: TokenInfo; user: UserInfo };
 
 /**
@@ -33,21 +33,6 @@ type AppState =
  */
 function resolveAuthMode(config: ValidatedConfig): 'pkce' | 'device-flow' | 'pat' {
   return config.github.authMode;
-}
-
-function createAuthProvider(config: ValidatedConfig): AuthProvider {
-  const mode = resolveAuthMode(config);
-  if (mode === 'pkce') {
-    return new PkceFlowProvider(
-      config.github.clientId,
-      'repo',
-      config.github.callbackUrl,
-    );
-  }
-  if (mode === 'device-flow') {
-    return new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy);
-  }
-  return new PatFlowProvider();
 }
 
 export function App() {
@@ -84,11 +69,30 @@ function getConfig(state: AppState): ValidatedConfig | null {
   if (
     state.phase === 'loading-config' ||
     state.phase === 'config-error' ||
-    state.phase === 'no-config'
+    state.phase === 'no-config' ||
+    state.phase === 'direct-url'
   ) {
     return null;
   }
   return state.config;
+}
+
+/**
+ * Create all auth providers that the config supports.
+ * Each wizard method gets its own provider instance so the user
+ * can pick any method regardless of the config's default authMode.
+ */
+function createProviders(config: ValidatedConfig) {
+  const hasClientId = config.github.clientId !== '';
+  return {
+    pat: new PatFlowProvider(),
+    pkce: hasClientId
+      ? new PkceFlowProvider(config.github.clientId, 'repo', config.github.callbackUrl)
+      : null,
+    deviceFlow: hasClientId
+      ? new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy)
+      : null,
+  };
 }
 
 function AppContent({
@@ -105,28 +109,35 @@ function AppContent({
 
   const config = getConfig(state);
 
-  const authProvider = useMemo(() => {
+  const providers = useMemo(() => {
     if (!config) return null;
-    return createAuthProvider(config);
+    return createProviders(config);
   }, [config]);
 
-  const effectiveAuthMode = config ? resolveAuthMode(config) : null;
+  // The "primary" provider is the one matching config's authMode — used for
+  // stored-token checks, PKCE callbacks, and logout.
+  const primaryProvider = useMemo((): AuthProvider | null => {
+    if (!providers || !config) return null;
+    const mode = resolveAuthMode(config);
+    if (mode === 'pkce') return providers.pkce;
+    if (mode === 'device-flow') return providers.deviceFlow;
+    return providers.pat;
+  }, [providers, config]);
 
   // Check for stored token on config load, and handle PKCE callback
   useEffect(() => {
-    if (state.phase !== 'checking-auth' || !authProvider || !config) return;
+    if (state.phase !== 'checking-auth' || !primaryProvider || !config) return;
     const currentConfig = config;
 
     // If PKCE and we have a pending callback (?code= in URL), process it
     if (
-      effectiveAuthMode === 'pkce' &&
-      authProvider instanceof PkceFlowProvider &&
-      authProvider.hasPendingCallback()
+      providers?.pkce instanceof PkceFlowProvider &&
+      providers.pkce.hasPendingCallback()
     ) {
-      authProvider
+      providers.pkce
         .login()
         .then((token) => {
-          return authProvider.loadStoredToken().then((stored) => {
+          return providers.pkce!.loadStoredToken().then((stored) => {
             if (stored) {
               setState({
                 phase: 'ready',
@@ -145,8 +156,8 @@ function AppContent({
       return;
     }
 
-    // Check for stored token
-    authProvider
+    // Check for stored token using the primary provider
+    primaryProvider
       .loadStoredToken()
       .then((stored) => {
         if (stored) {
@@ -163,59 +174,56 @@ function AppContent({
       .catch(() => {
         setState({ phase: 'login', config: currentConfig });
       });
-  }, [state.phase, config, authProvider, effectiveAuthMode, setState]);
+  }, [state.phase, config, providers, primaryProvider, setState]);
 
-  const startLogin = useCallback(() => {
-    if (!authProvider || !config) return;
+  const startPkceLogin = useCallback(() => {
+    if (!providers?.pkce || !config) return;
     const currentConfig = config;
     setLoginError(undefined);
 
-    if (effectiveAuthMode === 'pkce') {
-      authProvider.login().catch((err: unknown) => {
+    providers.pkce.login().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setLoginError(message);
+      setState({ phase: 'login', config: currentConfig });
+    });
+  }, [config, providers, setState]);
+
+  const startDeviceFlowLogin = useCallback(() => {
+    if (!providers?.deviceFlow || !config) return;
+    const currentConfig = config;
+    const dfProvider = providers.deviceFlow;
+    setLoginError(undefined);
+
+    dfProvider
+      .login((flowState) => setDeviceFlowState(flowState))
+      .then((token) => {
+        return dfProvider.loadStoredToken().then((stored) => {
+          if (stored) {
+            setState({
+              phase: 'ready',
+              config: currentConfig,
+              token,
+              user: stored.user,
+            });
+          }
+        });
+      })
+      .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : 'Login failed';
         setLoginError(message);
-        setState({ phase: 'login', config: currentConfig });
+        setDeviceFlowState({ status: 'error', error: message });
       });
-      return;
-    }
-
-    if (effectiveAuthMode === 'device-flow') {
-      setState({ phase: 'device-flow', config: currentConfig });
-      (authProvider as DeviceFlowProvider)
-        .login((flowState) => setDeviceFlowState(flowState))
-        .then((token) => {
-          return authProvider.loadStoredToken().then((stored) => {
-            if (stored) {
-              setState({
-                phase: 'ready',
-                config: currentConfig,
-                token,
-                user: stored.user,
-              });
-            }
-          });
-        })
-        .catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : 'Login failed';
-          setLoginError(message);
-          setDeviceFlowState({ status: 'error', error: message });
-          setState({ phase: 'login', config: currentConfig });
-        });
-      return;
-    }
-
-    // PAT mode — login() without a token just prompts; handled by startPatLogin
-  }, [config, authProvider, effectiveAuthMode, setState]);
+  }, [config, providers, setState]);
 
   const startPatLogin = useCallback((token: string) => {
-    if (!authProvider || !config) return;
+    if (!providers || !config) return;
     const currentConfig = config;
     setLoginError(undefined);
 
-    (authProvider as PatFlowProvider)
+    providers.pat
       .login(token)
       .then((tokenInfo) => {
-        return authProvider.loadStoredToken().then((stored) => {
+        return providers.pat.loadStoredToken().then((stored) => {
           if (stored) {
             setState({
               phase: 'ready',
@@ -230,12 +238,16 @@ function AppContent({
         const message = err instanceof Error ? err.message : 'Invalid token';
         setLoginError(message);
       });
-  }, [config, authProvider, setState]);
+  }, [config, providers, setState]);
+
+  const startDirectUrlLogin = useCallback((url: string, auth?: { token?: string; username?: string; password?: string }) => {
+    setState({ phase: 'direct-url', repoUrl: url, auth });
+  }, [setState]);
 
   const handleLogout = useCallback(() => {
-    if (!authProvider || !config) return;
+    if (!primaryProvider || !config) return;
     const currentConfig = config;
-    authProvider
+    primaryProvider
       .logout()
       .then(() => {
         setState({ phase: 'login', config: currentConfig });
@@ -243,7 +255,28 @@ function AppContent({
       .catch(() => {
         setState({ phase: 'login', config: currentConfig });
       });
-  }, [authProvider, config, setState]);
+  }, [primaryProvider, config, setState]);
+
+  // Determine which wizard methods are available based on config
+  const wizardMethods = useMemo(() => {
+    if (!config) {
+      return { pat: true, githubApp: false, deviceFlow: false, directUrl: true };
+    }
+    const hasClientId = config.github.clientId !== '';
+    return {
+      pat: true,
+      githubApp: hasClientId,
+      deviceFlow: hasClientId,
+      directUrl: true,
+    };
+  }, [config]);
+
+  const cancelDeviceFlow = useCallback(() => {
+    if (providers?.deviceFlow) {
+      providers.deviceFlow.cancelLogin();
+    }
+    setDeviceFlowState({ status: 'idle' });
+  }, [providers]);
 
   switch (state.phase) {
     case 'loading-config':
@@ -282,27 +315,31 @@ function AppContent({
       );
 
     case 'login':
+    case 'device-flow':
       return (
-        <LoginScreen
-          onLogin={startLogin}
+        <LoginWizard
           onPatLogin={startPatLogin}
+          onPkceLogin={startPkceLogin}
+          onDeviceFlowLogin={startDeviceFlowLogin}
+          onDirectUrlLogin={startDirectUrlLogin}
           error={loginError}
-          authMode={effectiveAuthMode ?? undefined}
+          deviceFlowState={deviceFlowState}
+          onDeviceFlowCancel={cancelDeviceFlow}
+          availableMethods={wizardMethods}
         />
       );
 
-    case 'device-flow':
+    case 'direct-url':
       return (
-        <DeviceFlowScreen
-          state={deviceFlowState}
-          onCancel={() => {
-            if (authProvider instanceof DeviceFlowProvider) {
-              authProvider.cancelLogin();
-            }
+        <DirectUrlView
+          repoUrl={state.repoUrl}
+          auth={state.auth}
+          onBack={() => {
             if (config) {
               setState({ phase: 'login', config });
+            } else {
+              setState({ phase: 'no-config' });
             }
-            setDeviceFlowState({ status: 'idle' });
           }}
         />
       );
@@ -317,6 +354,37 @@ function AppContent({
         />
       );
   }
+}
+
+/**
+ * Handles a direct-url clone attempt. Tries anonymous first, shows progress.
+ * For now, shows a loading state — the full git clone integration will come
+ * when the direct URL feature is connected to the git client.
+ */
+function DirectUrlView({
+  repoUrl,
+  auth,
+  onBack,
+}: {
+  repoUrl: string;
+  auth?: { token?: string; username?: string; password?: string };
+  onBack: () => void;
+}) {
+  return (
+    <div className="pp-wizard-screen" role="status">
+      <div className="pp-wizard-header">
+        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
+          &larr; Back
+        </button>
+        <h1>Connecting to Repository</h1>
+        <p>
+          Cloning <code>{repoUrl}</code>
+          {auth ? ' with provided credentials' : ' anonymously'}...
+        </p>
+      </div>
+      <LoadingScreen message="Connecting..." />
+    </div>
+  );
 }
 
 /**

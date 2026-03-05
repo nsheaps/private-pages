@@ -15,18 +15,21 @@ test.describe('Private Pages App', () => {
     await expect(page.getByText('Configuration Error')).toBeVisible();
   });
 
-  test('shows login screen with URL param config', async ({ page }) => {
+  test('shows login wizard with URL param config', async ({ page }) => {
     await page.goto('/?repo=org/repo&client_id=Iv1.test');
     await expect(
-      page.getByText('Sign in with GitHub to view private repository content.'),
+      page.getByText("Choose how you'd like to connect to your repository."),
     ).toBeVisible({ timeout: 10000 });
   });
 
-  test('login button is present', async ({ page }) => {
+  test('login wizard shows available methods', async ({ page }) => {
     await page.goto('/?repo=org/repo&client_id=Iv1.test');
     await expect(
-      page.getByRole('button', { name: 'Sign in with GitHub' }),
+      page.getByTestId('wizard-choose-method'),
     ).toBeVisible({ timeout: 10000 });
+    // PAT and Direct URL are always available
+    await expect(page.getByTestId('wizard-option-pat-input')).toBeVisible();
+    await expect(page.getByTestId('wizard-option-direct-url')).toBeVisible();
   });
 
   test('retry button on config error reloads config', async ({ page }) => {

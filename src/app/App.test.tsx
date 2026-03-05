@@ -68,12 +68,12 @@ describe('App', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('shows login screen after config loads and no stored token', async () => {
+  it('shows login wizard after config loads and no stored token', async () => {
     mockLoadConfig.mockResolvedValue(testConfig);
     render(<App />);
     await waitFor(() => {
       expect(
-        screen.getByText('Sign in with GitHub to view private repository content.'),
+        screen.getByText("Choose how you'd like to connect to your repository."),
       ).toBeInTheDocument();
     });
   });

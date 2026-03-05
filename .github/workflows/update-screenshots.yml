@@ -1,0 +1,80 @@
+name: Update Documentation Screenshots
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: update-screenshots-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    name: Capture Screenshots
+    runs-on: ubuntu-latest
+    # Skip draft PRs — same gate as E2E tests
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code (push)
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout code (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
+
+      - name: Authenticate as GitHub App
+        id: auth
+        if: ${{ secrets.AUTOMATION_GITHUB_APP_ID != '' }}
+        uses: ./.github/actions/github-app-auth
+        with:
+          app-id: ${{ secrets.AUTOMATION_GITHUB_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run screenshot tests
+        run: npx playwright test test/e2e/screenshots.spec.ts
+
+      - name: Upload screenshots as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizard-screenshots
+          path: docs/screenshots/*.png
+          retention-days: 14
+
+      - name: Check for screenshot changes
+        id: changes
+        run: |
+          if [ -n "$(git diff --name-only docs/screenshots/)" ] || [ -n "$(git ls-files --others --exclude-standard docs/screenshots/)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated screenshots
+        if: steps.changes.outputs.changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: 'docs(ui): update login wizard screenshots'
+          file_pattern: 'docs/screenshots/*.png'
+          branch: ${{ github.head_ref || github.ref_name }}
