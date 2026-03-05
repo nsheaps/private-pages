@@ -58,6 +58,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
       repo: repoName,
       branch: matchedSite.branch,
       token: token.accessToken,
+      corsProxy: config.github.corsProxy,
       onProgress: setCloneProgress,
     });
 
@@ -215,6 +216,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
               repo: repoName,
               branch: matchedSite.branch,
               token: token.accessToken,
+              corsProxy: config.github.corsProxy,
               onProgress: setCloneProgress,
             });
             client

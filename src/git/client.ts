@@ -28,7 +28,7 @@ function isGitError(err: unknown): err is IsomorphicGitError {
  * Turn a raw error from isomorphic-git / fetch into a user-friendly message
  * that includes enough detail so the user doesn't need to open DevTools.
  */
-function friendlyCloneError(err: unknown, owner: string, repo: string): Error {
+function friendlyCloneError(err: unknown, owner: string, repo: string, corsProxy: string | undefined): Error {
   // isomorphic-git HTTP errors (401, 403, 404, 5xx …)
   if (isGitError(err) && err.code === 'HttpError' && err.data?.statusCode) {
     const { statusCode, statusMessage } = err.data;
@@ -68,9 +68,16 @@ function friendlyCloneError(err: unknown, owner: string, repo: string): Error {
     err instanceof TypeError &&
     /fetch|network|cors/i.test(err.message)
   ) {
+    if (!corsProxy) {
+      return new Error(
+        `Network error while cloning ${owner}/${repo}: ${err.message}. ` +
+          'This is likely a CORS issue — GitHub does not allow direct git requests from the browser. ' +
+          'Configure a CORS proxy in your site config (github.corsProxy).',
+      );
+    }
     return new Error(
       `Network error while cloning ${owner}/${repo}: ${err.message}. ` +
-        'Check your internet connection and ensure nothing is blocking requests to github.com.',
+        'Check your internet connection and ensure the CORS proxy is reachable.',
     );
   }
 
@@ -87,6 +94,7 @@ export class GitClient {
   private repo: string;
   private branch: string;
   private token: string;
+  private corsProxy: string | undefined;
   private onProgress?: (progress: CloneProgress) => void;
   private fs: OpfsFs | null = null;
   private dir = '/';
@@ -96,12 +104,14 @@ export class GitClient {
     repo: string;
     branch: string;
     token: string;
+    corsProxy?: string;
     onProgress?: (progress: CloneProgress) => void;
   }) {
     this.owner = options.owner;
     this.repo = options.repo;
     this.branch = options.branch;
     this.token = options.token;
+    this.corsProxy = options.corsProxy;
     this.onProgress = options.onProgress;
   }
 
@@ -133,6 +143,7 @@ export class GitClient {
           dir: this.dir,
           url: this.url,
           ref: this.branch,
+          corsProxy: this.corsProxy,
           singleBranch: true,
           depth: 1,
           noCheckout: true,
@@ -172,7 +183,7 @@ export class GitClient {
         return state;
       });
     } catch (err) {
-      throw friendlyCloneError(err, this.owner, this.repo);
+      throw friendlyCloneError(err, this.owner, this.repo, this.corsProxy);
     }
   }
 
@@ -188,6 +199,7 @@ export class GitClient {
           dir: this.dir,
           url: this.url,
           ref: this.branch,
+          corsProxy: this.corsProxy,
           singleBranch: true,
           onAuth,
           onProgress: this.onProgress
@@ -222,7 +234,7 @@ export class GitClient {
         return state;
       });
     } catch (err) {
-      throw friendlyCloneError(err, this.owner, this.repo);
+      throw friendlyCloneError(err, this.owner, this.repo, this.corsProxy);
     }
   }
 
