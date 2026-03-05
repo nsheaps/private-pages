@@ -38,6 +38,27 @@ const STEP_DEPTH: Record<WizardStep, number> = {
   'help': 1,
 };
 
+const VALID_STEPS = new Set<string>(Object.keys(STEP_DEPTH));
+
+function isWizardStep(value: unknown): value is WizardStep {
+  return typeof value === 'string' && VALID_STEPS.has(value);
+}
+
+/** Build the hash fragment for a wizard step */
+function stepToHash(step: WizardStep): string {
+  if (step === 'choose-method') return '#/login';
+  return `#/login/${step}`;
+}
+
+/** Parse the current hash to a wizard step, or null if it doesn't match */
+function hashToStep(): WizardStep | null {
+  const hash = window.location.hash;
+  if (!hash || hash === '#/' || hash === '#/login') return 'choose-method';
+  const match = hash.match(/^#\/login\/(.+)$/);
+  if (match && isWizardStep(match[1])) return match[1];
+  return null;
+}
+
 export function LoginWizard({
   onPatLogin,
   onPkceLogin,
@@ -49,7 +70,9 @@ export function LoginWizard({
   onDeviceFlowCancel,
   availableMethods,
 }: LoginWizardProps) {
-  const [state, setState] = useState<WizardState>({ step: 'choose-method' });
+  // Initialize from hash if it contains a valid wizard step
+  const initialStep = hashToStep() ?? 'choose-method';
+  const [state, setState] = useState<WizardState>({ step: initialStep });
   const [slideDirection, setSlideDirection] = useState<'none' | 'left' | 'right'>('none');
   const [animating, setAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,13 +84,49 @@ export function LoginWizard({
     directUrl: true,
   };
 
+  // Set the initial hash on mount if it doesn't already point to a wizard step
+  useEffect(() => {
+    const current = hashToStep();
+    if (current === null) {
+      window.history.replaceState({ wizardStep: 'choose-method' }, '', stepToHash('choose-method'));
+    } else {
+      window.history.replaceState({ wizardStep: current }, '', stepToHash(current));
+    }
+  }, []);
+
+  // Listen for browser back/forward button
+  useEffect(() => {
+    function onPopState(event: PopStateEvent) {
+      const step = event.state?.wizardStep;
+      if (isWizardStep(step)) {
+        setSlideDirection('right');
+        setAnimating(true);
+        setState((prev) => {
+          if (step === 'choose-method') {
+            return { ...prev, step, error: undefined, helpTopic: undefined };
+          }
+          return { ...prev, step, error: undefined };
+        });
+      } else {
+        // Try parsing from hash as fallback
+        const fromHash = hashToStep();
+        const target = fromHash ?? 'choose-method';
+        setSlideDirection('right');
+        setAnimating(true);
+        setState((prev) => ({ ...prev, step: target, error: undefined, helpTopic: undefined }));
+      }
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   const navigateTo = useCallback((nextStep: WizardStep, currentStep: WizardStep) => {
     const direction = STEP_DEPTH[nextStep] >= STEP_DEPTH[currentStep] ? 'left' : 'right';
     setSlideDirection(direction);
     setAnimating(true);
   }, []);
 
-  // When animation starts, wait for the exit animation then update state
+  // When animation starts, wait for the exit animation then clear
   useEffect(() => {
     if (!animating) return;
     const timer = setTimeout(() => {
@@ -77,31 +136,33 @@ export function LoginWizard({
     return () => clearTimeout(timer);
   }, [animating]);
 
+  /** Push a new history entry for the given step */
+  const pushStep = useCallback((step: WizardStep) => {
+    window.history.pushState({ wizardStep: step }, '', stepToHash(step));
+  }, []);
+
   const goTo = useCallback((step: WizardStep) => {
     navigateTo(step, state.step);
+    pushStep(step);
     setState((prev) => ({ ...prev, step, error: undefined }));
-  }, [navigateTo, state.step]);
+  }, [navigateTo, state.step, pushStep]);
 
   const goHome = useCallback(() => {
     navigateTo('choose-method', state.step);
+    pushStep('choose-method');
     setState((prev) => ({ ...prev, step: 'choose-method', error: undefined }));
-  }, [navigateTo, state.step]);
+  }, [navigateTo, state.step, pushStep]);
 
   const goBack = useCallback(() => {
-    setState((prev) => {
-      const nextStep = prev.step === 'direct-url-credentials' ? 'direct-url' : 'choose-method';
-      navigateTo(nextStep, prev.step);
-      if (prev.step === 'help') {
-        return { ...prev, step: 'choose-method', error: undefined, helpTopic: undefined };
-      }
-      return { ...prev, step: nextStep as WizardStep, error: undefined };
-    });
-  }, [navigateTo]);
+    // Use browser history so the back button stays consistent
+    window.history.back();
+  }, []);
 
   const showHelp = useCallback((topic: HelpTopic) => {
     navigateTo('help', state.step);
+    pushStep('help');
     setState((prev) => ({ ...prev, step: 'help', helpTopic: topic }));
-  }, [navigateTo, state.step]);
+  }, [navigateTo, state.step, pushStep]);
 
   const handleDirectUrlSubmit = useCallback((url: string) => {
     setState((prev) => ({ ...prev, repoUrl: url, loading: true }));
@@ -110,13 +171,14 @@ export function LoginWizard({
 
   const handleDirectUrlCredentials = useCallback((mode: DirectUrlCredentialMode) => {
     navigateTo('direct-url-credentials', 'direct-url');
+    pushStep('direct-url-credentials');
     setState((prev) => ({
       ...prev,
       step: 'direct-url-credentials',
       credentialMode: mode,
       anonymousFailed: true,
     }));
-  }, [navigateTo]);
+  }, [navigateTo, pushStep]);
 
   const handleCredentialSubmit = useCallback((auth: { token?: string; username?: string; password?: string }) => {
     if (state.repoUrl) {

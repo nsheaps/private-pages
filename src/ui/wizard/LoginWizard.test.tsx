@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LoginWizard } from './LoginWizard';
 
 const defaultProps = {
@@ -10,6 +10,11 @@ const defaultProps = {
 };
 
 describe('LoginWizard', () => {
+  beforeEach(() => {
+    // Reset hash before each test
+    window.location.hash = '';
+  });
+
   it('renders the method selection screen by default', () => {
     render(<LoginWizard {...defaultProps} />);
     expect(screen.getByTestId('wizard-choose-method')).toBeInTheDocument();
@@ -49,6 +54,12 @@ describe('LoginWizard', () => {
     expect(screen.getByTestId('wizard-pat-input')).toBeInTheDocument();
   });
 
+  it('updates URL hash when navigating to a step', () => {
+    render(<LoginWizard {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('wizard-option-pat-input'));
+    expect(window.location.hash).toBe('#/login/pat-input');
+  });
+
   it('navigates to GitHub App when option is clicked', () => {
     render(<LoginWizard {...defaultProps} />);
     fireEvent.click(screen.getByTestId('wizard-option-github-app'));
@@ -67,11 +78,21 @@ describe('LoginWizard', () => {
     expect(screen.getByTestId('wizard-direct-url')).toBeInTheDocument();
   });
 
-  it('navigates back from PAT input to method selection', () => {
+  it('navigates back from PAT input via popstate', async () => {
     render(<LoginWizard {...defaultProps} />);
     fireEvent.click(screen.getByTestId('wizard-option-pat-input'));
-    fireEvent.click(screen.getByLabelText('Back'));
-    expect(screen.getByTestId('wizard-choose-method')).toBeInTheDocument();
+    expect(screen.getByTestId('wizard-pat-input')).toBeInTheDocument();
+
+    // Simulate browser back button (popstate with the previous state)
+    act(() => {
+      window.dispatchEvent(
+        new PopStateEvent('popstate', { state: { wizardStep: 'choose-method' } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-choose-method')).toBeInTheDocument();
+    });
   });
 
   it('shows help page when help link is clicked', () => {
