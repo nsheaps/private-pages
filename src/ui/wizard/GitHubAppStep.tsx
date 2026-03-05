@@ -1,18 +1,15 @@
 interface GitHubAppStepProps {
   onLogin: () => void;
   onBack: () => void;
-  onHelp: () => void;
+  onHome: () => void;
   loading?: boolean;
   error?: string;
 }
 
-export function GitHubAppStep({ onLogin, onBack, onHelp, loading, error }: GitHubAppStepProps) {
+export function GitHubAppStep({ onLogin, loading, error }: GitHubAppStepProps) {
   return (
     <div className="pp-wizard-screen" role="main" data-testid="wizard-github-app">
       <div className="pp-wizard-header">
-        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
-          &larr; Back
-        </button>
         <h1>Sign in with GitHub</h1>
         <p>
           You'll be redirected to GitHub to authorize this application.
@@ -39,9 +36,6 @@ export function GitHubAppStep({ onLogin, onBack, onHelp, loading, error }: GitHu
 
       <div className="pp-wizard-help-section">
         <p>This uses the secure PKCE OAuth flow. No secrets are stored on any server.</p>
-        <button type="button" className="pp-link-button" onClick={onHelp} data-testid="wizard-help-link">
-          Learn more about GitHub App authentication
-        </button>
       </div>
     </div>
   );

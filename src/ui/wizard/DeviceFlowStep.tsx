@@ -3,8 +3,8 @@ import type { DeviceFlowState } from '../../auth/types';
 interface DeviceFlowStepProps {
   onLogin: () => void;
   onBack: () => void;
+  onHome: () => void;
   onCancel?: () => void;
-  onHelp: () => void;
   deviceFlowState?: DeviceFlowState;
   loading?: boolean;
   error?: string;
@@ -12,9 +12,8 @@ interface DeviceFlowStepProps {
 
 export function DeviceFlowStep({
   onLogin,
-  onBack,
   onCancel,
-  onHelp,
+  onBack,
   deviceFlowState,
   loading,
   error,
@@ -37,9 +36,6 @@ export function DeviceFlowStep({
     return (
       <div className="pp-wizard-screen" role="status" data-testid="wizard-device-flow-polling">
         <div className="pp-wizard-header">
-          <button type="button" className="pp-wizard-back" onClick={onCancel ?? onBack} aria-label="Cancel">
-            &larr; Cancel
-          </button>
           <h1>Enter Code on GitHub</h1>
           <p>
             Go to{' '}
@@ -59,6 +55,14 @@ export function DeviceFlowStep({
         </div>
 
         <p className="pp-device-flow-hint">Waiting for authorization...</p>
+
+        <button
+          type="button"
+          className="pp-wizard-button"
+          onClick={onCancel ?? onBack}
+        >
+          Cancel
+        </button>
       </div>
     );
   }
@@ -66,9 +70,6 @@ export function DeviceFlowStep({
   return (
     <div className="pp-wizard-screen" role="main" data-testid="wizard-device-flow">
       <div className="pp-wizard-header">
-        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
-          &larr; Back
-        </button>
         <h1>Device Flow</h1>
         <p>
           Sign in by entering a one-time code on github.com.
@@ -90,12 +91,6 @@ export function DeviceFlowStep({
           data-testid="wizard-device-flow-start"
         >
           {loading ? 'Starting...' : 'Start Device Flow'}
-        </button>
-      </div>
-
-      <div className="pp-wizard-help-section">
-        <button type="button" className="pp-link-button" onClick={onHelp} data-testid="wizard-help-link">
-          Learn more about Device Flow authentication
         </button>
       </div>
     </div>

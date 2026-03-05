@@ -2,7 +2,6 @@ import type { WizardStep } from './types';
 
 interface ChooseMethodStepProps {
   onChoose: (step: WizardStep) => void;
-  onHelp: () => void;
   error?: string;
   availableMethods: {
     pat?: boolean;
@@ -19,7 +18,7 @@ interface MethodOption {
   enabled: boolean;
 }
 
-export function ChooseMethodStep({ onChoose, onHelp, error, availableMethods }: ChooseMethodStepProps) {
+export function ChooseMethodStep({ onChoose, error, availableMethods }: ChooseMethodStepProps) {
   const options: MethodOption[] = [
     {
       step: 'github-app',
@@ -74,12 +73,6 @@ export function ChooseMethodStep({ onChoose, onHelp, error, availableMethods }: 
             <span className="pp-wizard-option-desc">{option.description}</span>
           </button>
         ))}
-      </div>
-
-      <div className="pp-wizard-footer">
-        <button type="button" className="pp-link-button" onClick={onHelp} data-testid="wizard-help-link">
-          Help: Which method should I use?
-        </button>
       </div>
     </div>
   );

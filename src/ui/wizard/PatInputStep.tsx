@@ -3,12 +3,12 @@ import { useState } from 'react';
 interface PatInputStepProps {
   onSubmit: (token: string) => void;
   onBack: () => void;
-  onHelp: () => void;
+  onHome: () => void;
   loading?: boolean;
   error?: string;
 }
 
-export function PatInputStep({ onSubmit, onBack, onHelp, loading, error }: PatInputStepProps) {
+export function PatInputStep({ onSubmit, loading, error }: PatInputStepProps) {
   const [token, setToken] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -21,9 +21,6 @@ export function PatInputStep({ onSubmit, onBack, onHelp, loading, error }: PatIn
   return (
     <div className="pp-wizard-screen" role="main" data-testid="wizard-pat-input">
       <div className="pp-wizard-header">
-        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
-          &larr; Back
-        </button>
         <h1>Personal Access Token</h1>
         <p>
           Enter a GitHub Personal Access Token with <code>repo</code> scope to access private repositories.
@@ -65,9 +62,6 @@ export function PatInputStep({ onSubmit, onBack, onHelp, loading, error }: PatIn
           </a>{' '}
           with <code>repo</code> scope.
         </p>
-        <button type="button" className="pp-link-button" onClick={onHelp} data-testid="wizard-help-link">
-          Learn more about Personal Access Tokens
-        </button>
       </div>
     </div>
   );

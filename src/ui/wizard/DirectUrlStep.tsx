@@ -5,7 +5,7 @@ interface DirectUrlStepProps {
   onSubmit: (url: string) => void;
   onCredentialsFallback: (mode: DirectUrlCredentialMode) => void;
   onBack: () => void;
-  onHelp: () => void;
+  onHome: () => void;
   loading?: boolean;
   error?: string;
   anonymousFailed?: boolean;
@@ -14,8 +14,6 @@ interface DirectUrlStepProps {
 export function DirectUrlStep({
   onSubmit,
   onCredentialsFallback,
-  onBack,
-  onHelp,
   loading,
   error,
   anonymousFailed,
@@ -32,9 +30,6 @@ export function DirectUrlStep({
   return (
     <div className="pp-wizard-screen" role="main" data-testid="wizard-direct-url">
       <div className="pp-wizard-header">
-        <button type="button" className="pp-wizard-back" onClick={onBack} aria-label="Back">
-          &larr; Back
-        </button>
         <h1>Direct Repository URL</h1>
         <p>
           Enter a Git repository URL from any host (GitHub, GitLab, Bitbucket, self-hosted, etc.).
@@ -90,11 +85,6 @@ export function DirectUrlStep({
         </div>
       )}
 
-      <div className="pp-wizard-help-section">
-        <button type="button" className="pp-link-button" onClick={onHelp} data-testid="wizard-help-link">
-          Learn more about direct repository access
-        </button>
-      </div>
     </div>
   );
 }
