@@ -54,9 +54,10 @@ function createAuthProvider(config: ValidatedConfig): AuthProvider {
       config.github.clientId,
       'repo',
       config.github.callbackUrl,
+      config.github.corsProxy,
     );
   }
-  return new DeviceFlowProvider(config.github.clientId);
+  return new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy);
 }
 
 export function App() {

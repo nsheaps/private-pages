@@ -29,11 +29,19 @@ export type DeviceFlowCallback = (state: DeviceFlowState) => void;
 export class DeviceFlowProvider implements AuthProvider {
   private clientId: string;
   private scope: string;
+  private corsProxy: string | undefined;
   private abortController: AbortController | null = null;
 
-  constructor(clientId: string, scope = 'repo') {
+  constructor(clientId: string, scope = 'repo', corsProxy?: string) {
     this.clientId = clientId;
     this.scope = scope;
+    this.corsProxy = corsProxy;
+  }
+
+  private proxyUrl(url: string): string {
+    if (!this.corsProxy) return url;
+    const proxy = this.corsProxy.replace(/\/+$/, '');
+    return `${proxy}/${url}`;
   }
 
   async login(onStateChange?: DeviceFlowCallback): Promise<TokenInfo> {
@@ -101,7 +109,7 @@ export class DeviceFlowProvider implements AuthProvider {
   }
 
   private async requestDeviceCode(): Promise<DeviceCodeResponse> {
-    const response = await fetch(GITHUB_DEVICE_CODE_URL, {
+    const response = await fetch(this.proxyUrl(GITHUB_DEVICE_CODE_URL), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -138,7 +146,7 @@ export class DeviceFlowProvider implements AuthProvider {
 
       await sleep(pollInterval);
 
-      const response = await fetch(GITHUB_TOKEN_URL, {
+      const response = await fetch(this.proxyUrl(GITHUB_TOKEN_URL), {
         method: 'POST',
         headers: {
           Accept: 'application/json',

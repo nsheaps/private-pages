@@ -18,11 +18,19 @@ export class PkceFlowProvider implements AuthProvider {
   private clientId: string;
   private scope: string;
   private redirectUri: string;
+  private corsProxy: string | undefined;
 
-  constructor(clientId: string, scope = 'repo', redirectUri?: string) {
+  constructor(clientId: string, scope = 'repo', redirectUri?: string, corsProxy?: string) {
     this.clientId = clientId;
     this.scope = scope;
     this.redirectUri = redirectUri ?? window.location.origin + window.location.pathname;
+    this.corsProxy = corsProxy;
+  }
+
+  private proxyUrl(url: string): string {
+    if (!this.corsProxy) return url;
+    const proxy = this.corsProxy.replace(/\/+$/, '');
+    return `${proxy}/${url}`;
   }
 
   async login(): Promise<TokenInfo> {
@@ -118,7 +126,7 @@ export class PkceFlowProvider implements AuthProvider {
     code: string,
     verifier: string,
   ): Promise<TokenInfo> {
-    const response = await fetch(GITHUB_TOKEN_URL, {
+    const response = await fetch(this.proxyUrl(GITHUB_TOKEN_URL), {
       method: 'POST',
       headers: {
         Accept: 'application/json',

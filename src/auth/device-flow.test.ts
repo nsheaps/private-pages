@@ -114,6 +114,65 @@ describe('DeviceFlowProvider', () => {
     });
   });
 
+  describe('corsProxy', () => {
+    it('prefixes GitHub URLs with CORS proxy when configured', async () => {
+      const proxyProvider = new DeviceFlowProvider(
+        'test-client-id',
+        'repo',
+        'https://proxy.example.com',
+      );
+      const mockFetch = vi.mocked(fetch);
+
+      // Device code request
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            device_code: 'dc-123',
+            user_code: 'ABCD-1234',
+            verification_uri: 'https://github.com/login/device',
+            expires_in: 900,
+            interval: 0,
+          }),
+          { status: 200 },
+        ),
+      );
+
+      // Token poll returns token
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: 'gho_test123',
+            token_type: 'bearer',
+            scope: 'repo',
+          }),
+          { status: 200 },
+        ),
+      );
+
+      // User info
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 1,
+            login: 'testuser',
+            avatar_url: 'https://avatars.githubusercontent.com/u/1',
+            name: 'Test User',
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await proxyProvider.login();
+
+      expect(mockFetch.mock.calls[0]![0]).toBe(
+        'https://proxy.example.com/https://github.com/login/device/code',
+      );
+      expect(mockFetch.mock.calls[1]![0]).toBe(
+        'https://proxy.example.com/https://github.com/login/oauth/access_token',
+      );
+    });
+  });
+
   describe('validateToken', () => {
     it('returns true for valid token', async () => {
       vi.mocked(fetch).mockResolvedValueOnce(
