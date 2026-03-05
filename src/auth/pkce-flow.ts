@@ -2,15 +2,15 @@ import type { AuthProvider, TokenInfo, UserInfo } from './types';
 import { storeToken, loadToken, clearToken } from './token-store';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
-const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_API_URL = 'https://api.github.com';
 
 /**
  * PKCE (Proof Key for Code Exchange) OAuth flow.
  *
- * This flow redirects to GitHub's authorization page, then the user is
- * redirected back with a `code` query parameter. The code is exchanged
- * for an access token using the PKCE verifier.
+ * The token exchange is handled by the shared /auth/callback page.
+ * This provider stores PKCE parameters in sessionStorage before
+ * redirecting to GitHub, and reads the token result from
+ * sessionStorage when the callback page redirects back.
  *
  * Note: GitHub's PKCE support requires a GitHub App (not an OAuth App).
  */
@@ -18,40 +18,28 @@ export class PkceFlowProvider implements AuthProvider {
   private clientId: string;
   private scope: string;
   private redirectUri: string;
-  private corsProxy: string | undefined;
 
-  constructor(clientId: string, scope = 'repo', redirectUri?: string, corsProxy?: string) {
+  constructor(clientId: string, scope = 'repo', redirectUri?: string) {
     this.clientId = clientId;
     this.scope = scope;
     this.redirectUri = redirectUri ?? window.location.origin + window.location.pathname;
-    this.corsProxy = corsProxy;
-  }
-
-  private proxyUrl(url: string): string {
-    if (!this.corsProxy) return url;
-    const proxy = this.corsProxy.replace(/\/+$/, '');
-    return `${proxy}/${url}`;
   }
 
   async login(): Promise<TokenInfo> {
-    // Check if we're returning from GitHub with a code
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const storedState = sessionStorage.getItem('pp_pkce_state');
-    const storedVerifier = sessionStorage.getItem('pp_pkce_verifier');
-    const returnedState = params.get('state');
-
-    if (code && storedState && storedVerifier && returnedState === storedState) {
-      // Clean up URL and session storage
-      const url = new URL(window.location.href);
-      url.searchParams.delete('code');
-      url.searchParams.delete('state');
-      window.history.replaceState({}, '', url.toString());
-      sessionStorage.removeItem('pp_pkce_state');
-      sessionStorage.removeItem('pp_pkce_verifier');
-
-      // Exchange code for token
-      const token = await this.exchangeCode(code, storedVerifier);
+    // Check if the callback page already exchanged the code for a token
+    const tokenResult = sessionStorage.getItem('pp_pkce_token_result');
+    if (tokenResult) {
+      sessionStorage.removeItem('pp_pkce_token_result');
+      const data = JSON.parse(tokenResult) as {
+        access_token: string;
+        token_type: string;
+        scope: string;
+      };
+      const token: TokenInfo = {
+        accessToken: data.access_token,
+        tokenType: data.token_type,
+        scope: data.scope,
+      };
       const user = await this.fetchUser(token.accessToken);
       await storeToken(token, user);
       return token;
@@ -63,6 +51,8 @@ export class PkceFlowProvider implements AuthProvider {
 
     sessionStorage.setItem('pp_pkce_verifier', verifier);
     sessionStorage.setItem('pp_pkce_state', state);
+    sessionStorage.setItem('pp_pkce_client_id', this.clientId);
+    sessionStorage.setItem('pp_pkce_redirect_uri', this.redirectUri);
     sessionStorage.setItem('pp_pkce_return_url', window.location.origin + window.location.pathname);
 
     const authorizeUrl = new URL(GITHUB_AUTHORIZE_URL);
@@ -112,57 +102,10 @@ export class PkceFlowProvider implements AuthProvider {
   }
 
   /**
-   * Check if we have a pending PKCE callback (returning from GitHub).
+   * Check if the callback page completed a token exchange.
    */
   hasPendingCallback(): boolean {
-    const params = new URLSearchParams(window.location.search);
-    return (
-      params.has('code') &&
-      params.has('state') &&
-      sessionStorage.getItem('pp_pkce_state') !== null
-    );
-  }
-
-  private async exchangeCode(
-    code: string,
-    verifier: string,
-  ): Promise<TokenInfo> {
-    const body = new URLSearchParams({
-      client_id: this.clientId,
-      code,
-      code_verifier: verifier,
-      redirect_uri: this.redirectUri,
-    });
-
-    const response = await fetch(this.proxyUrl(GITHUB_TOKEN_URL), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-      },
-      body,
-    });
-
-    if (!response.ok) {
-      throw new PkceError(
-        `Token exchange failed: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    const data = (await response.json()) as
-      | { access_token: string; token_type: string; scope: string }
-      | { error: string; error_description?: string };
-
-    if ('error' in data) {
-      throw new PkceError(
-        data.error_description ?? `Token exchange error: ${data.error}`,
-      );
-    }
-
-    return {
-      accessToken: data.access_token,
-      tokenType: data.token_type,
-      scope: data.scope,
-    };
+    return sessionStorage.getItem('pp_pkce_token_result') !== null;
   }
 
   private async fetchUser(accessToken: string): Promise<UserInfo> {

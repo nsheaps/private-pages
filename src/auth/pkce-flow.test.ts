@@ -18,8 +18,16 @@ describe('PkceFlowProvider', () => {
   });
 
   describe('hasPendingCallback', () => {
-    it('returns false with no code in URL', () => {
+    it('returns false with no token result in sessionStorage', () => {
       expect(provider.hasPendingCallback()).toBe(false);
+    });
+
+    it('returns true when token result exists in sessionStorage', () => {
+      sessionStorage.setItem(
+        'pp_pkce_token_result',
+        JSON.stringify({ access_token: 'gho_test', token_type: 'bearer', scope: 'repo' }),
+      );
+      expect(provider.hasPendingCallback()).toBe(true);
     });
   });
 
@@ -69,9 +77,11 @@ describe('PkceFlowProvider', () => {
       const result = await Promise.race([loginPromise, timeoutPromise]);
       expect(result).toBe('timeout');
 
-      // Verify PKCE state and return URL were stored in sessionStorage
+      // Verify PKCE state, client ID, and return URL were stored in sessionStorage
       expect(sessionStorage.getItem('pp_pkce_verifier')).toBeTruthy();
       expect(sessionStorage.getItem('pp_pkce_state')).toBeTruthy();
+      expect(sessionStorage.getItem('pp_pkce_client_id')).toBe('test-client-id');
+      expect(sessionStorage.getItem('pp_pkce_redirect_uri')).toBe('http://localhost:3000/');
       expect(sessionStorage.getItem('pp_pkce_return_url')).toBeTruthy();
     });
   });
