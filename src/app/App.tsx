@@ -2,24 +2,62 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RouterProvider, useRouter } from './Router';
 import { loadConfig, ConfigError } from '../config/loader';
+import { PkceFlowProvider } from '../auth/pkce-flow';
 import { DeviceFlowProvider } from '../auth/device-flow';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { LoginScreen } from '../ui/LoginScreen';
 import { DeviceFlowScreen } from '../ui/DeviceFlowScreen';
+import { SetupPage } from '../ui/SetupPage';
 import { SiteLandingPage } from '../ui/SiteLandingPage';
 import { RepoPickerPage } from '../ui/RepoPickerPage';
 import { SiteView } from './SiteView';
 import type { ValidatedConfig } from '../config/schema';
-import type { DeviceFlowState, TokenInfo, UserInfo } from '../auth/types';
+import type { AuthProvider, DeviceFlowState, TokenInfo, UserInfo } from '../auth/types';
 
 type AppState =
   | { phase: 'loading-config' }
+  | { phase: 'no-config' }
   | { phase: 'config-error'; message: string }
   | { phase: 'checking-auth'; config: ValidatedConfig }
   | { phase: 'login'; config: ValidatedConfig }
   | { phase: 'device-flow'; config: ValidatedConfig }
   | { phase: 'ready'; config: ValidatedConfig; token: TokenInfo; user: UserInfo };
+
+/**
+ * Determine the effective auth mode:
+ * - If PKCE is configured and the current URL matches the callbackUrl, use PKCE
+ * - Otherwise, fall back to device-flow
+ */
+function resolveAuthMode(config: ValidatedConfig): 'pkce' | 'device-flow' {
+  if (config.github.authMode === 'device-flow') return 'device-flow';
+
+  // PKCE: check if callback URL matches current location
+  const callbackUrl = config.github.callbackUrl;
+  if (callbackUrl) {
+    const current = window.location.origin + window.location.pathname;
+    // Normalize trailing slashes for comparison
+    const normalize = (u: string) => u.replace(/\/+$/, '');
+    if (normalize(current) !== normalize(callbackUrl)) {
+      // Current URL doesn't match registered callback — device flow fallback
+      return 'device-flow';
+    }
+  }
+  // If no callbackUrl configured, PKCE uses current URL as redirect_uri
+  return 'pkce';
+}
+
+function createAuthProvider(config: ValidatedConfig): AuthProvider {
+  const mode = resolveAuthMode(config);
+  if (mode === 'pkce') {
+    return new PkceFlowProvider(
+      config.github.clientId,
+      'repo',
+      config.github.callbackUrl,
+    );
+  }
+  return new DeviceFlowProvider(config.github.clientId);
+}
 
 export function App() {
   const [state, setState] = useState<AppState>({ phase: 'loading-config' });
@@ -27,7 +65,11 @@ export function App() {
   useEffect(() => {
     loadConfig()
       .then((config) => {
-        setState({ phase: 'checking-auth', config });
+        if (!config) {
+          setState({ phase: 'no-config' });
+        } else {
+          setState({ phase: 'checking-auth', config });
+        }
       })
       .catch((err: unknown) => {
         const message =
@@ -48,7 +90,11 @@ export function App() {
 }
 
 function getConfig(state: AppState): ValidatedConfig | null {
-  if (state.phase === 'loading-config' || state.phase === 'config-error') {
+  if (
+    state.phase === 'loading-config' ||
+    state.phase === 'config-error' ||
+    state.phase === 'no-config'
+  ) {
     return null;
   }
   return state.config;
@@ -67,17 +113,48 @@ function AppContent({
   const [loginError, setLoginError] = useState<string>();
 
   const config = getConfig(state);
-  const clientId = config?.github.clientId ?? null;
 
   const authProvider = useMemo(() => {
-    if (!clientId) return null;
-    return new DeviceFlowProvider(clientId);
-  }, [clientId]);
+    if (!config) return null;
+    return createAuthProvider(config);
+  }, [config]);
 
-  // Check for stored token on config load
+  const effectiveAuthMode = config ? resolveAuthMode(config) : null;
+
+  // Check for stored token on config load, and handle PKCE callback
   useEffect(() => {
     if (state.phase !== 'checking-auth' || !authProvider || !config) return;
     const currentConfig = config;
+
+    // If PKCE and we have a pending callback (?code= in URL), process it
+    if (
+      effectiveAuthMode === 'pkce' &&
+      authProvider instanceof PkceFlowProvider &&
+      authProvider.hasPendingCallback()
+    ) {
+      authProvider
+        .login()
+        .then((token) => {
+          return authProvider.loadStoredToken().then((stored) => {
+            if (stored) {
+              setState({
+                phase: 'ready',
+                config: currentConfig,
+                token,
+                user: stored.user,
+              });
+            }
+          });
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Login failed';
+          setLoginError(message);
+          setState({ phase: 'login', config: currentConfig });
+        });
+      return;
+    }
+
+    // Check for stored token
     authProvider
       .loadStoredToken()
       .then((stored) => {
@@ -95,16 +172,26 @@ function AppContent({
       .catch(() => {
         setState({ phase: 'login', config: currentConfig });
       });
-  }, [state.phase, config, authProvider, setState]);
+  }, [state.phase, config, authProvider, effectiveAuthMode, setState]);
 
   const startLogin = useCallback(() => {
     if (!authProvider || !config) return;
     const currentConfig = config;
-
-    setState({ phase: 'device-flow', config: currentConfig });
     setLoginError(undefined);
 
-    authProvider
+    if (effectiveAuthMode === 'pkce') {
+      // PKCE: redirect to GitHub (leaves the page)
+      authProvider.login().catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        setLoginError(message);
+        setState({ phase: 'login', config: currentConfig });
+      });
+      return;
+    }
+
+    // Device flow
+    setState({ phase: 'device-flow', config: currentConfig });
+    (authProvider as DeviceFlowProvider)
       .login((flowState) => setDeviceFlowState(flowState))
       .then((token) => {
         return authProvider.loadStoredToken().then((stored) => {
@@ -124,7 +211,7 @@ function AppContent({
         setDeviceFlowState({ status: 'error', error: message });
         setState({ phase: 'login', config: currentConfig });
       });
-  }, [config, authProvider, setState]);
+  }, [config, authProvider, effectiveAuthMode, setState]);
 
   const handleLogout = useCallback(() => {
     if (!authProvider || !config) return;
@@ -135,7 +222,6 @@ function AppContent({
         setState({ phase: 'login', config: currentConfig });
       })
       .catch(() => {
-        // Clear state even if logout fails
         setState({ phase: 'login', config: currentConfig });
       });
   }, [authProvider, config, setState]);
@@ -145,6 +231,9 @@ function AppContent({
     case 'checking-auth':
       return <LoadingScreen message="Loading..." />;
 
+    case 'no-config':
+      return <SetupPage />;
+
     case 'config-error':
       return (
         <ErrorScreen
@@ -153,7 +242,13 @@ function AppContent({
           onRetry={() => {
             setState({ phase: 'loading-config' });
             loadConfig()
-              .then((c) => setState({ phase: 'checking-auth', config: c }))
+              .then((c) => {
+                if (!c) {
+                  setState({ phase: 'no-config' });
+                } else {
+                  setState({ phase: 'checking-auth', config: c });
+                }
+              })
               .catch((err: unknown) =>
                 setState({
                   phase: 'config-error',
@@ -172,6 +267,7 @@ function AppContent({
         <LoginScreen
           onLogin={startLogin}
           error={loginError}
+          authMode={effectiveAuthMode ?? undefined}
         />
       );
 
@@ -180,7 +276,9 @@ function AppContent({
         <DeviceFlowScreen
           state={deviceFlowState}
           onCancel={() => {
-            authProvider?.cancelLogin();
+            if (authProvider instanceof DeviceFlowProvider) {
+              authProvider.cancelLogin();
+            }
             if (config) {
               setState({ phase: 'login', config });
             }
@@ -203,8 +301,8 @@ function AppContent({
 
 /**
  * Decides what to render once the user is authenticated:
- * - If config has pre-defined sites → SiteView (with SiteLandingPage at root for multi-site)
- * - If no sites → parse hash for ad-hoc repo (#/owner/repo/path) or show repo picker
+ * - If config has pre-defined sites -> SiteView (with SiteLandingPage at root for multi-site)
+ * - If no sites -> parse hash for ad-hoc repo (#/owner/repo/path) or show repo picker
  */
 function ReadyView({
   config,
@@ -272,7 +370,7 @@ function ReadyView({
     );
   }
 
-  // At root with no sites → show repo picker
+  // At root with no sites -> show repo picker
   return (
     <RepoPickerPage
       token={token.accessToken}

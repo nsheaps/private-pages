@@ -5,8 +5,10 @@ import { ConfigSchema, type ValidatedConfig } from './schema';
  * 1. URL query parameters (for simple single-site deployments)
  * 2. Build-time env vars (VITE_PP_CONFIG as JSON string)
  * 3. Runtime JSON file (/config.json fetched at startup)
+ *
+ * Returns null if no config source is found (app shows setup guide).
  */
-export async function loadConfig(): Promise<ValidatedConfig> {
+export async function loadConfig(): Promise<ValidatedConfig | null> {
   const fromParams = loadFromUrlParams();
   if (fromParams) return fromParams;
 
@@ -38,7 +40,8 @@ function loadFromUrlParams(): ValidatedConfig | null {
   const raw = {
     github: {
       clientId,
-      authMode: params.get('auth_mode') ?? 'device-flow',
+      ...(params.get('auth_mode') ? { authMode: params.get('auth_mode') } : {}),
+      ...(params.get('callback_url') ? { callbackUrl: params.get('callback_url') } : {}),
       ...(params.get('cors_proxy') ? { corsProxy: params.get('cors_proxy') } : {}),
     },
     sites,
@@ -73,24 +76,18 @@ function loadFromEnvVars(): ValidatedConfig | null {
   return result.data;
 }
 
-async function loadFromJsonFile(): Promise<ValidatedConfig> {
+async function loadFromJsonFile(): Promise<ValidatedConfig | null> {
   const base = import.meta.env.BASE_URL ?? '/';
   const configUrl = `${base.endsWith('/') ? base : base + '/'}config.json`;
   let response: Response;
   try {
     response = await fetch(configUrl);
   } catch {
-    throw new ConfigError(
-      'No config found. Provide URL params (?repo=owner/repo&client_id=...), ' +
-        'set VITE_PP_CONFIG env var, or place a config.json at the app root.',
-    );
+    return null;
   }
 
   if (!response.ok) {
-    throw new ConfigError(
-      `Failed to load /config.json (${String(response.status)}). ` +
-        'Provide config via URL params or VITE_PP_CONFIG env var instead.',
-    );
+    return null;
   }
 
   let raw: unknown;

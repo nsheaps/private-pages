@@ -30,21 +30,32 @@ describe('loadConfig', () => {
       setSearchParams('?repo=org/repo&client_id=Iv1.abc&branch=gh-pages&dir=dist/');
       const config = await loadConfig();
 
-      expect(config.github.clientId).toBe('Iv1.abc');
-      expect(config.github.authMode).toBe('device-flow');
-      expect(config.sites[0]?.repo).toBe('org/repo');
-      expect(config.sites[0]?.branch).toBe('gh-pages');
-      expect(config.sites[0]?.directory).toBe('dist/');
-      expect(config.sites[0]?.path).toBe('/');
+      expect(config).not.toBeNull();
+      expect(config!.github.clientId).toBe('Iv1.abc');
+      expect(config!.github.authMode).toBe('pkce');
+      expect(config!.sites[0]?.repo).toBe('org/repo');
+      expect(config!.sites[0]?.branch).toBe('gh-pages');
+      expect(config!.sites[0]?.directory).toBe('dist/');
+      expect(config!.sites[0]?.path).toBe('/');
+    });
+
+    it('loads config with only client_id (no repo)', async () => {
+      setSearchParams('?client_id=Iv1.abc');
+      const config = await loadConfig();
+
+      expect(config).not.toBeNull();
+      expect(config!.github.clientId).toBe('Iv1.abc');
+      expect(config!.sites).toEqual([]);
     });
 
     it('uses defaults for optional URL params', async () => {
       setSearchParams('?repo=org/repo&client_id=Iv1.abc');
       const config = await loadConfig();
 
-      expect(config.sites[0]?.branch).toBe('main');
-      expect(config.sites[0]?.directory).toBe('/');
-      expect(config.sites[0]?.fetchTtlSeconds).toBe(60);
+      expect(config).not.toBeNull();
+      expect(config!.sites[0]?.branch).toBe('main');
+      expect(config!.sites[0]?.directory).toBe('/');
+      expect(config!.sites[0]?.fetchTtlSeconds).toBe(60);
     });
 
     it('throws ConfigError for invalid URL param config', async () => {
@@ -62,8 +73,9 @@ describe('loadConfig', () => {
       });
 
       const config = await loadConfig();
-      expect(config.github.clientId).toBe('Iv1.env');
-      expect(config.sites[0]?.repo).toBe('org/docs');
+      expect(config).not.toBeNull();
+      expect(config!.github.clientId).toBe('Iv1.env');
+      expect(config!.sites[0]?.repo).toBe('org/docs');
     });
 
     it('throws ConfigError for invalid JSON in env var', async () => {
@@ -85,21 +97,24 @@ describe('loadConfig', () => {
       );
 
       const config = await loadConfig();
-      expect(config.github.clientId).toBe('Iv1.file');
+      expect(config).not.toBeNull();
+      expect(config!.github.clientId).toBe('Iv1.file');
     });
 
-    it('throws ConfigError when config.json fetch fails', async () => {
+    it('returns null when config.json fetch fails', async () => {
       setSearchParams('');
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
-      await expect(loadConfig()).rejects.toThrow(ConfigError);
+      const config = await loadConfig();
+      expect(config).toBeNull();
     });
 
-    it('throws ConfigError when config.json returns 404', async () => {
+    it('returns null when config.json returns 404', async () => {
       setSearchParams('');
       vi.mocked(fetch).mockResolvedValue(
         new Response('Not found', { status: 404 }),
       );
-      await expect(loadConfig()).rejects.toThrow(ConfigError);
+      const config = await loadConfig();
+      expect(config).toBeNull();
     });
 
     it('throws ConfigError for invalid JSON in config.json', async () => {
@@ -120,8 +135,9 @@ describe('loadConfig', () => {
       });
 
       const config = await loadConfig();
-      expect(config.github.clientId).toBe('Iv1.url');
-      expect(config.sites[0]?.repo).toBe('org/url-repo');
+      expect(config).not.toBeNull();
+      expect(config!.github.clientId).toBe('Iv1.url');
+      expect(config!.sites[0]?.repo).toBe('org/url-repo');
     });
   });
 });

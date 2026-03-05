@@ -21,6 +21,7 @@ export type AuthState =
 export interface AuthProvider {
   login(): Promise<TokenInfo>;
   validateToken(token: TokenInfo): Promise<boolean>;
+  loadStoredToken(): Promise<{ token: TokenInfo; user: UserInfo } | null>;
   logout(): Promise<void>;
 }
 

@@ -10,7 +10,8 @@ export const SiteConfigSchema = z.object({
 
 export const GithubConfigSchema = z.object({
   clientId: z.string(),
-  authMode: z.enum(['pkce', 'device-flow']).default('device-flow'),
+  authMode: z.enum(['pkce', 'device-flow']).default('pkce'),
+  callbackUrl: z.string().url().optional(),
   corsProxy: z.string().url().optional(),
 });
 

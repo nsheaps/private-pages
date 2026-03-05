@@ -39,7 +39,7 @@ describe('ConfigSchema', () => {
     const result = ConfigSchema.safeParse(config);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.github.authMode).toBe('device-flow');
+      expect(result.data.github.authMode).toBe('pkce');
       expect(result.data.sites[0]?.branch).toBe('main');
       expect(result.data.sites[0]?.directory).toBe('/');
       expect(result.data.sites[0]?.fetchTtlSeconds).toBe(60);

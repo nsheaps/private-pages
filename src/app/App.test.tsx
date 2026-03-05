@@ -21,12 +21,16 @@ vi.mock('../auth/device-flow', () => ({
     loadStoredToken: vi.fn().mockResolvedValue(null),
     cancelLogin: vi.fn(),
   })),
-  AuthError: class AuthError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'AuthError';
-    }
-  },
+}));
+
+vi.mock('../auth/pkce-flow', () => ({
+  PkceFlowProvider: vi.fn().mockImplementation(() => ({
+    login: vi.fn(),
+    validateToken: vi.fn(),
+    logout: vi.fn(),
+    loadStoredToken: vi.fn().mockResolvedValue(null),
+    hasPendingCallback: vi.fn().mockReturnValue(false),
+  })),
 }));
 
 const mockLoadConfig = vi.mocked(loadConfig);
@@ -70,6 +74,14 @@ describe('App', () => {
     render(<App />);
     await waitFor(() => {
       expect(screen.getByText('No config found')).toBeInTheDocument();
+    });
+  });
+
+  it('shows setup page when no config exists', async () => {
+    mockLoadConfig.mockResolvedValue(null);
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Quick Start')).toBeInTheDocument();
     });
   });
 });
