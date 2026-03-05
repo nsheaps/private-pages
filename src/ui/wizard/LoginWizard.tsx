@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { DeviceFlowState } from '../../auth/types';
 import type { WizardState, WizardStep, HelpTopic, DirectUrlCredentialMode } from './types';
 import { ChooseMethodStep } from './ChooseMethodStep';
@@ -73,9 +73,8 @@ export function LoginWizard({
   // Initialize from hash if it contains a valid wizard step
   const initialStep = hashToStep() ?? 'choose-method';
   const [state, setState] = useState<WizardState>({ step: initialStep });
-  const [slideDirection, setSlideDirection] = useState<'none' | 'left' | 'right'>('none');
-  const [animating, setAnimating] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [slideDirection, setSlideDirection] = useState<'none' | 'forward' | 'back'>('none');
+
 
   const methods = availableMethods ?? {
     pat: true,
@@ -99,8 +98,7 @@ export function LoginWizard({
     function onPopState(event: PopStateEvent) {
       const step = event.state?.wizardStep;
       if (isWizardStep(step)) {
-        setSlideDirection('right');
-        setAnimating(true);
+        setSlideDirection('back');
         setState((prev) => {
           if (step === 'choose-method') {
             return { ...prev, step, error: undefined, helpTopic: undefined };
@@ -111,8 +109,7 @@ export function LoginWizard({
         // Try parsing from hash as fallback
         const fromHash = hashToStep();
         const target = fromHash ?? 'choose-method';
-        setSlideDirection('right');
-        setAnimating(true);
+        setSlideDirection('back');
         setState((prev) => ({ ...prev, step: target, error: undefined, helpTopic: undefined }));
       }
     }
@@ -121,20 +118,9 @@ export function LoginWizard({
   }, []);
 
   const navigateTo = useCallback((nextStep: WizardStep, currentStep: WizardStep) => {
-    const direction = STEP_DEPTH[nextStep] >= STEP_DEPTH[currentStep] ? 'left' : 'right';
+    const direction = STEP_DEPTH[nextStep] >= STEP_DEPTH[currentStep] ? 'forward' : 'back';
     setSlideDirection(direction);
-    setAnimating(true);
   }, []);
-
-  // When animation starts, wait for the exit animation then clear
-  useEffect(() => {
-    if (!animating) return;
-    const timer = setTimeout(() => {
-      setAnimating(false);
-      setSlideDirection('none');
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [animating]);
 
   /** Push a new history entry for the given step */
   const pushStep = useCallback((step: WizardStep) => {
@@ -192,9 +178,8 @@ export function LoginWizard({
 
   // Build the slide animation class
   let slideClass = '';
-  if (animating && slideDirection === 'left') slideClass = ' pp-wizard-slide-exit-left';
-  else if (animating && slideDirection === 'right') slideClass = ' pp-wizard-slide-exit-right';
-  else if (!animating && slideDirection === 'none') slideClass = ' pp-wizard-slide-enter';
+  if (slideDirection === 'forward') slideClass = ' pp-wizard-slide-from-right';
+  else if (slideDirection === 'back') slideClass = ' pp-wizard-slide-from-left';
 
   const stepContent = (() => {
     switch (state.step) {
@@ -281,7 +266,7 @@ export function LoginWizard({
   })();
 
   return (
-    <div className="pp-wizard-container" ref={containerRef}>
+    <div className="pp-wizard-container">
       <div className="pp-wizard-topbar">
         {!isHome && (
           <button type="button" className="pp-wizard-back" onClick={goBack} aria-label="Back">
@@ -298,7 +283,10 @@ export function LoginWizard({
           Help
         </button>
       </div>
-      <div className={`pp-wizard-step-wrapper${slideClass}`}>
+      <div
+        className={`pp-wizard-step-wrapper${slideClass}`}
+        onAnimationEnd={() => setSlideDirection('none')}
+      >
         {stepContent}
       </div>
     </div>
