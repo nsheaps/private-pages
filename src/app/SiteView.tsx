@@ -118,11 +118,25 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
     route.path === site.path || route.path.startsWith(site.path + '/'),
   ) ?? config.sites[0];
 
-  // Fetch branches and detect the best default branch
+  // Fetch branches for the dropdown and detect the best default branch.
+  // If the config branch was explicitly set (e.g. via @branch in URL),
+  // use it directly instead of auto-detecting.
   useEffect(() => {
     if (!matchedSite) return;
 
     const { owner, repoName } = parseSiteRepo(matchedSite.repo);
+    const explicitBranch = matchedSite.branch !== 'main' ? matchedSite.branch : null;
+
+    if (explicitBranch) {
+      // Branch was explicitly chosen — use it, but still fetch the list for the dropdown
+      setActiveBranch(explicitBranch);
+      fetchBranches(owner, repoName, token.accessToken).then((branchList) => {
+        setBranches(branchList);
+      }).catch(() => { /* dropdown won't populate, that's ok */ });
+      return;
+    }
+
+    // No explicit branch — auto-detect
     setViewState({ phase: 'detecting-branch', siteConfig: matchedSite });
 
     Promise.all([
@@ -136,8 +150,8 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
       // If branch detection fails, fall back to the configured branch
       setActiveBranch(matchedSite.branch);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when repo changes
-  }, [matchedSite?.repo, token.accessToken]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when repo/branch changes
+  }, [matchedSite?.repo, matchedSite?.branch, token.accessToken]);
 
   // Clone/fetch the repo once we know the branch
   useEffect(() => {

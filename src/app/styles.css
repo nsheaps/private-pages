@@ -252,24 +252,30 @@ body {
 
 .pp-site-card {
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  border: 1px solid #d1d5da;
+  border-radius: 8px;
+  background: white;
+}
+
+.pp-site-card:hover {
+  border-color: #0366d6;
+  background: #f6f8fa;
 }
 
 .pp-site-link {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 1rem;
-  border: 1px solid #d1d5da;
-  border-radius: 8px;
-  background: white;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  background: transparent;
   cursor: pointer;
   text-align: left;
-}
-
-.pp-site-link:hover {
-  border-color: #0366d6;
-  background: #f6f8fa;
 }
 
 .pp-site-name {
@@ -285,6 +291,34 @@ body {
 .pp-site-branch {
   font-size: 0.75rem;
   color: #959da5;
+}
+
+.pp-branch-label {
+  font-size: 0.75rem;
+  color: #959da5;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-right: 0.75rem;
+}
+
+.pp-branch-label:hover {
+  border-color: #0366d6;
+  color: #0366d6;
+}
+
+.pp-branch-select {
+  font-size: 0.75rem;
+  color: #24292e;
+  background: #f6f8fa;
+  border: 1px solid #d1d5da;
+  border-radius: 4px;
+  padding: 0.25rem 0.25rem;
+  cursor: pointer;
+  margin-right: 0.75rem;
 }
 
 /* Settings panel */

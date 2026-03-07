@@ -468,7 +468,7 @@ function ReadyView({
         {
           path: `/${adHocParsed.owner}/${adHocParsed.repo}`,
           repo: `${adHocParsed.owner}/${adHocParsed.repo}`,
-          branch: 'main',
+          branch: adHocParsed.branch ?? 'main',
           directory: '/',
           fetchTtlSeconds: 60,
         },
@@ -489,7 +489,7 @@ function ReadyView({
     <RepoPickerPage
       token={token.accessToken}
       userLogin={user.login}
-      onSelectRepo={(repo) => navigate(`/${repo}`)}
+      onSelectRepo={(repo, branch) => navigate(`/${repo}@${branch}`)}
       onLogout={onLogout}
     />
   );
@@ -499,8 +499,19 @@ const RESERVED_ROUTES = new Set(['login', 'auth', 'setup', 'help']);
 
 function parseAdHocRoute(
   segments: string[],
-): { owner: string; repo: string } | null {
+): { owner: string; repo: string; branch?: string } | null {
   if (segments.length < 2) return null;
   if (RESERVED_ROUTES.has(segments[0]!)) return null;
-  return { owner: segments[0]!, repo: segments[1]! };
+
+  // Parse optional @branch suffix from repo segment: "repo@branch"
+  const repoSegment = segments[1]!;
+  const atIndex = repoSegment.indexOf('@');
+  if (atIndex > 0) {
+    return {
+      owner: segments[0]!,
+      repo: repoSegment.slice(0, atIndex),
+      branch: repoSegment.slice(atIndex + 1),
+    };
+  }
+  return { owner: segments[0]!, repo: repoSegment };
 }
