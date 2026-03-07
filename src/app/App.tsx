@@ -461,14 +461,17 @@ function ReadyView({
 
   // No sites configured: ad-hoc mode
   if (adHocParsed) {
-    // Build a temporary config with the ad-hoc repo
+    // Build a temporary config with the ad-hoc repo.
+    // The site path must match the full route path (including @branch)
+    // so that subPath calculation in SiteView works correctly.
+    const routeBase = route.path.split('/').slice(0, 3).join('/');
     const adHocConfig: ValidatedConfig = {
       ...config,
       sites: [
         {
-          path: `/${adHocParsed.owner}/${adHocParsed.repo}`,
+          path: routeBase,
           repo: `${adHocParsed.owner}/${adHocParsed.repo}`,
-          branch: adHocParsed.branch ?? 'main',
+          branch: adHocParsed.branch ?? 'gh-pages',
           directory: '/',
           fetchTtlSeconds: 60,
         },

@@ -152,7 +152,7 @@ body {
 /* Rendered page iframe */
 .pp-rendered-page {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   border: none;
 }
 
@@ -414,10 +414,13 @@ body {
   margin-top: 0.25rem;
 }
 
-/* Content container */
+/* Content container — full viewport when rendering */
 .pp-content-container {
-  width: 100%;
-  min-height: calc(100vh - 24px);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 24px; /* leave room for status bar */
 }
 
 .pp-user-info {

@@ -23,7 +23,6 @@ interface SiteViewProps {
 }
 
 type ViewState =
-  | { phase: 'detecting-branch'; siteConfig: SiteConfig }
   | { phase: 'cloning'; siteConfig: SiteConfig }
   | { phase: 'clone-error'; siteConfig: SiteConfig; error: string }
   | { phase: 'rendering'; siteConfig: SiteConfig; repoState: RepoState | null }
@@ -64,44 +63,6 @@ async function fetchBranches(
   }
 }
 
-async function fetchDefaultBranch(
-  owner: string,
-  repo: string,
-  token: string,
-): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `${GITHUB_API_URL}/repos/${owner}/${repo}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/vnd.github+json',
-        },
-      },
-    );
-    if (!response.ok) return null;
-    const data = (await response.json()) as { default_branch: string };
-    return data.default_branch;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Pick the best initial branch: prefer gh-pages if it exists,
- * otherwise use the repo's default branch.
- */
-function pickInitialBranch(
-  branches: string[],
-  defaultBranch: string | null,
-  configBranch: string,
-): string {
-  if (branches.includes('gh-pages')) return 'gh-pages';
-  if (defaultBranch && branches.includes(defaultBranch)) return defaultBranch;
-  if (branches.includes(configBranch)) return configBranch;
-  return defaultBranch ?? configBranch;
-}
-
 export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) {
   const { route } = useRouter();
   const [viewState, setViewState] = useState<ViewState | null>(null);
@@ -118,38 +79,16 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
     route.path === site.path || route.path.startsWith(site.path + '/'),
   ) ?? config.sites[0];
 
-  // Fetch branches for the dropdown and detect the best default branch.
-  // If the config branch was explicitly set (e.g. via @branch in URL),
-  // use it directly instead of auto-detecting.
+  // Use the config branch directly and fetch the branch list for the dropdown.
   useEffect(() => {
     if (!matchedSite) return;
 
     const { owner, repoName } = parseSiteRepo(matchedSite.repo);
-    const explicitBranch = matchedSite.branch !== 'main' ? matchedSite.branch : null;
+    setActiveBranch(matchedSite.branch);
 
-    if (explicitBranch) {
-      // Branch was explicitly chosen — use it, but still fetch the list for the dropdown
-      setActiveBranch(explicitBranch);
-      fetchBranches(owner, repoName, token.accessToken).then((branchList) => {
-        setBranches(branchList);
-      }).catch(() => { /* dropdown won't populate, that's ok */ });
-      return;
-    }
-
-    // No explicit branch — auto-detect
-    setViewState({ phase: 'detecting-branch', siteConfig: matchedSite });
-
-    Promise.all([
-      fetchBranches(owner, repoName, token.accessToken),
-      fetchDefaultBranch(owner, repoName, token.accessToken),
-    ]).then(([branchList, defaultBranch]) => {
+    fetchBranches(owner, repoName, token.accessToken).then((branchList) => {
       setBranches(branchList);
-      const best = pickInitialBranch(branchList, defaultBranch, matchedSite.branch);
-      setActiveBranch(best);
-    }).catch(() => {
-      // If branch detection fails, fall back to the configured branch
-      setActiveBranch(matchedSite.branch);
-    });
+    }).catch(() => { /* dropdown won't populate */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when repo/branch changes
   }, [matchedSite?.repo, matchedSite?.branch, token.accessToken]);
 
@@ -305,8 +244,6 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
   }
 
   switch (viewState.phase) {
-    case 'detecting-branch':
-      return <LoadingScreen message={`Detecting branches for ${matchedSite.repo}...`} />;
 
     case 'cloning':
       return (
