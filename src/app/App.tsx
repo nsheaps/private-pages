@@ -407,6 +407,14 @@ function ReadyView({
   const { route, navigate } = useRouter();
   const hasSites = config.sites.length > 0;
 
+  // Clear leftover login hash (e.g. #/login/pat-input) so we don't
+  // misinterpret it as an ad-hoc owner/repo route.
+  useEffect(() => {
+    if (route.path.startsWith('/login')) {
+      navigate('/');
+    }
+  }, [route.path, navigate]);
+
   // For ad-hoc mode (no sites), parse owner/repo from the hash
   const adHocParsed = !hasSites ? parseAdHocRoute(route.segments) : null;
 
@@ -470,9 +478,12 @@ function ReadyView({
   );
 }
 
+const RESERVED_ROUTES = new Set(['login', 'auth', 'setup', 'help']);
+
 function parseAdHocRoute(
   segments: string[],
 ): { owner: string; repo: string } | null {
   if (segments.length < 2) return null;
+  if (RESERVED_ROUTES.has(segments[0]!)) return null;
   return { owner: segments[0]!, repo: segments[1]! };
 }
