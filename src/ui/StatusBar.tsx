@@ -6,6 +6,7 @@ export interface StatusBarProps {
   branch?: string;
   branches?: string[];
   onBranchChange?: (branch: string) => void;
+  onBack?: () => void;
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -24,11 +25,17 @@ export function StatusBar({
   branch,
   branches,
   onBranchChange,
+  onBack,
 }: StatusBarProps) {
   const hasBranchOptions = branches && branches.length > 1 && onBranchChange;
 
   return (
     <div className="pp-status-bar" role="status">
+      {onBack && (
+        <button className="pp-status-back" onClick={onBack} aria-label="Back to repo list">
+          &larr;
+        </button>
+      )}
       {repoName && <span className="pp-status-repo">{repoName}</span>}
       {branch && (
         hasBranchOptions ? (

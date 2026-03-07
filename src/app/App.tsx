@@ -483,6 +483,7 @@ function ReadyView({
         token={token}
         userLogin={user.login}
         onLogout={onLogout}
+        onBack={() => navigate('/')}
       />
     );
   }

@@ -101,6 +101,20 @@ body {
   color: #959da5;
 }
 
+.pp-status-back {
+  background: none;
+  border: none;
+  color: #959da5;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.pp-status-back:hover {
+  color: #c9d1d9;
+}
+
 .pp-status-branch {
   color: #79b8ff;
 }
