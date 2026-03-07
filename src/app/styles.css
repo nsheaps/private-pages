@@ -103,16 +103,18 @@ body {
 
 .pp-status-back {
   background: none;
-  border: none;
-  color: #959da5;
+  border: 1px solid #444d56;
+  border-radius: 3px;
+  color: #c9d1d9;
   cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
   line-height: 1;
 }
 
 .pp-status-back:hover {
-  color: #c9d1d9;
+  background: #444d56;
+  color: #fff;
 }
 
 .pp-status-branch {

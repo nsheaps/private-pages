@@ -89,6 +89,15 @@ export function SiteView({ config, token, userLogin, onLogout, onBack }: SiteVie
 
     fetchBranches(owner, repoName, token.accessToken).then((branchList) => {
       setBranches(branchList);
+      // If the configured branch doesn't exist, fall back to a valid one
+      if (branchList.length > 0 && !branchList.includes(matchedSite.branch)) {
+        const fallback = branchList.includes('gh-pages')
+          ? 'gh-pages'
+          : branchList.includes('main')
+            ? 'main'
+            : branchList[0]!;
+        setActiveBranch(fallback);
+      }
     }).catch(() => { /* dropdown won't populate */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when repo/branch changes
   }, [matchedSite?.repo, matchedSite?.branch, token.accessToken]);
