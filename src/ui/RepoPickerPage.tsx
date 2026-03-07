@@ -143,7 +143,7 @@ function RepoCard({
   token: string;
   onSelect: (repo: string, branch: string) => void;
 }) {
-  const [selectedBranch, setSelectedBranch] = useState(repo.default_branch);
+  const [selectedBranch, setSelectedBranch] = useState('gh-pages');
   const [branches, setBranches] = useState<string[] | null>(null);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
@@ -160,9 +160,9 @@ function RepoCard({
         const data = (await res.json()) as BranchInfo[];
         const branchNames = data.map((b) => b.name);
         setBranches(branchNames);
-        // Auto-select gh-pages if available
-        if (branchNames.includes('gh-pages') && selectedBranch === repo.default_branch) {
-          setSelectedBranch('gh-pages');
+        // If gh-pages doesn't exist, fall back to repo's default branch
+        if (!branchNames.includes('gh-pages')) {
+          setSelectedBranch(repo.default_branch);
         }
       }
     } catch {
@@ -170,7 +170,7 @@ function RepoCard({
     } finally {
       setLoadingBranches(false);
     }
-  }, [branches, loadingBranches, repo.full_name, token, selectedBranch, repo.default_branch]);
+  }, [branches, loadingBranches, repo.full_name, token, repo.default_branch]);
 
   return (
     <li className="pp-site-card">
