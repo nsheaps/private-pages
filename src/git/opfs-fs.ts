@@ -17,6 +17,35 @@ declare global {
 
 type Callback<T = void> = (err: Error | null, result?: T) => void;
 
+interface NodeLikeError extends Error {
+  code: string;
+}
+
+/**
+ * Convert OPFS / DOMException errors to Node-like errors with string `code`.
+ *
+ * isomorphic-git's FileSystem wrapper checks `(err.code || '').includes('ENS')`
+ * but DOMException.code is a **number**, which causes `.includes is not a function`.
+ * This helper ensures the error always has a string `code` that isomorphic-git
+ * can understand.
+ */
+function toNodeError(err: unknown): NodeLikeError {
+  const message = err instanceof Error ? err.message : String(err);
+  const nodeErr = new Error(message) as NodeLikeError;
+
+  if (err instanceof DOMException && err.name === 'NotFoundError') {
+    nodeErr.code = 'ENOENT';
+  } else if (err instanceof DOMException && err.name === 'TypeMismatchError') {
+    nodeErr.code = 'ENOTDIR';
+  } else if (err instanceof Error && typeof (err as NodeLikeError).code === 'string') {
+    nodeErr.code = (err as NodeLikeError).code;
+  } else {
+    nodeErr.code = 'EIO';
+  }
+
+  return nodeErr;
+}
+
 interface Stats {
   type: 'file' | 'dir';
   mode: number;
@@ -90,7 +119,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         return new Uint8Array(await file.arrayBuffer());
       })().then(
         (result) => cb(null, result),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 
@@ -117,7 +146,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         await writable.close();
       })().then(
         () => cb(null),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 
@@ -127,7 +156,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         await parent.removeEntry(name);
       })().then(
         () => cb(null),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 
@@ -145,7 +174,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         return entries;
       })().then(
         (result) => cb(null, result),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 
@@ -157,7 +186,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         await parent.getDirectoryHandle(name, { create: true });
       })().then(
         () => cb(null),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 
@@ -167,7 +196,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         await parent.removeEntry(name, { recursive: true });
       })().then(
         () => cb(null),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 
@@ -188,7 +217,7 @@ export function createOpfsFs(root: FileSystemDirectoryHandle) {
         }
       })().then(
         (result) => cb(null, result),
-        (err: unknown) => cb(err instanceof Error ? err : new Error(String(err))),
+        (err: unknown) => cb(toNodeError(err)),
       );
     },
 

@@ -1,18 +1,99 @@
 import git from 'isomorphic-git';
-import http from 'isomorphic-git/http/web';
 import { createOpfsFs, type OpfsFs } from './opfs-fs';
-import { createAuthHelper } from './auth-helper';
+import { createAuthenticatedHttp } from './auth-helper';
 import { getRepoDir } from '../storage/opfs';
 import { getRepoMetadata, setRepoMetadata } from '../storage/idb';
 import type { CloneProgress, RepoState } from './types';
 
 const LOCK_PREFIX = 'private-pages-repo';
 
+/**
+ * isomorphic-git error shape — errors have a string `code` and a `data` bag.
+ */
+interface IsomorphicGitError extends Error {
+  code?: string;
+  data?: {
+    statusCode?: number;
+    statusMessage?: string;
+    response?: string;
+  };
+}
+
+function isGitError(err: unknown): err is IsomorphicGitError {
+  return err instanceof Error && typeof (err as IsomorphicGitError).code === 'string';
+}
+
+/**
+ * Turn a raw error from isomorphic-git / fetch into a user-friendly message
+ * that includes enough detail so the user doesn't need to open DevTools.
+ */
+function friendlyCloneError(err: unknown, owner: string, repo: string, corsProxy: string | undefined): Error {
+  // isomorphic-git HTTP errors (401, 403, 404, 5xx …)
+  if (isGitError(err) && err.code === 'HttpError' && err.data?.statusCode) {
+    const { statusCode, statusMessage } = err.data;
+    switch (statusCode) {
+      case 401:
+        return new Error(
+          `Authentication failed for ${owner}/${repo} (HTTP 401). ` +
+            'Your token may be invalid or expired — try signing out and back in.',
+        );
+      case 403:
+        return new Error(
+          `Access denied to ${owner}/${repo} (HTTP 403). ` +
+            'Your token may lack the required scopes, or the repository may restrict access.',
+        );
+      case 404:
+        return new Error(
+          `Repository ${owner}/${repo} was not found (HTTP 404). ` +
+            'Check that the repository exists and that your token has access to it.',
+        );
+      default:
+        return new Error(
+          `Could not clone ${owner}/${repo}: the server responded with HTTP ${statusCode} ${statusMessage ?? ''}.`.trim(),
+        );
+    }
+  }
+
+  // isomorphic-git SmartHttpError — usually means the response wasn't valid git smart-HTTP
+  if (isGitError(err) && err.code === 'SmartHttpError') {
+    return new Error(
+      `Could not clone ${owner}/${repo}: the server returned an unexpected response. ` +
+        'This can happen if the URL is wrong or a proxy is interfering with the request.',
+    );
+  }
+
+  // Browser-level network failure ("Failed to fetch", CORS, offline, etc.)
+  if (
+    err instanceof TypeError &&
+    /fetch|network|cors/i.test(err.message)
+  ) {
+    if (!corsProxy) {
+      return new Error(
+        `Network error while cloning ${owner}/${repo}: ${err.message}. ` +
+          'This is likely a CORS issue — GitHub does not allow direct git requests from the browser. ' +
+          'Configure a CORS proxy in your site config (github.corsProxy).',
+      );
+    }
+    return new Error(
+      `Network error while cloning ${owner}/${repo}: ${err.message}. ` +
+        'Check your internet connection and ensure the CORS proxy is reachable.',
+    );
+  }
+
+  // Fallback — preserve the original message
+  if (err instanceof Error) {
+    return new Error(`Could not clone ${owner}/${repo}: ${err.message}`);
+  }
+
+  return new Error(`Could not clone ${owner}/${repo}: an unknown error occurred.`);
+}
+
 export class GitClient {
   private owner: string;
   private repo: string;
   private branch: string;
   private token: string;
+  private corsProxy: string | undefined;
   private onProgress?: (progress: CloneProgress) => void;
   private fs: OpfsFs | null = null;
   private dir = '/';
@@ -22,12 +103,14 @@ export class GitClient {
     repo: string;
     branch: string;
     token: string;
+    corsProxy?: string;
     onProgress?: (progress: CloneProgress) => void;
   }) {
     this.owner = options.owner;
     this.repo = options.repo;
     this.branch = options.branch;
     this.token = options.token;
+    this.corsProxy = options.corsProxy;
     this.onProgress = options.onProgress;
   }
 
@@ -48,100 +131,108 @@ export class GitClient {
   }
 
   async clone(): Promise<RepoState> {
-    return this.withLock(async () => {
-      const fs = await this.ensureFs();
-      const { onAuth } = createAuthHelper(this.token);
+    try {
+      return await this.withLock(async () => {
+        const fs = await this.ensureFs();
+        const http = createAuthenticatedHttp(this.token);
 
-      await git.clone({
-        fs,
-        http,
-        dir: this.dir,
-        url: this.url,
-        ref: this.branch,
-        singleBranch: true,
-        depth: 1,
-        noCheckout: true,
-        onAuth,
-        onProgress: this.onProgress
-          ? (event) => {
-              this.onProgress!({
-                phase: event.phase,
-                loaded: event.loaded,
-                total: event.total,
-                lengthComputable: event.total > 0,
-              });
-            }
-          : undefined,
+        await git.clone({
+          fs,
+          http,
+          dir: this.dir,
+          url: this.url,
+          ref: this.branch,
+          corsProxy: this.corsProxy,
+          singleBranch: true,
+          depth: 1,
+          noCheckout: true,
+          onProgress: this.onProgress
+            ? (event) => {
+                this.onProgress!({
+                  phase: event.phase,
+                  loaded: event.loaded,
+                  total: event.total,
+                  lengthComputable: event.total > 0,
+                });
+              }
+            : undefined,
+        });
+
+        const headSha = await git.resolveRef({
+          fs,
+          dir: this.dir,
+          ref: this.branch,
+        });
+
+        const state: RepoState = {
+          owner: this.owner,
+          repo: this.repo,
+          branch: this.branch,
+          lastFetchAt: Date.now(),
+          headCommitSha: headSha,
+          totalSizeBytes: 0,
+          cloneComplete: true,
+        };
+
+        await setRepoMetadata({
+          ...state,
+        });
+
+        return state;
       });
-
-      const headSha = await git.resolveRef({
-        fs,
-        dir: this.dir,
-        ref: this.branch,
-      });
-
-      const state: RepoState = {
-        owner: this.owner,
-        repo: this.repo,
-        branch: this.branch,
-        lastFetchAt: Date.now(),
-        headCommitSha: headSha,
-        totalSizeBytes: 0,
-        cloneComplete: true,
-      };
-
-      await setRepoMetadata({
-        ...state,
-      });
-
-      return state;
-    });
+    } catch (err) {
+      throw friendlyCloneError(err, this.owner, this.repo, this.corsProxy);
+    }
   }
 
   async fetch(): Promise<RepoState> {
-    return this.withLock(async () => {
-      const fs = await this.ensureFs();
-      const { onAuth } = createAuthHelper(this.token);
+    try {
+      return await this.withLock(async () => {
+        const fs = await this.ensureFs();
+        const http = createAuthenticatedHttp(this.token);
 
-      await git.fetch({
-        fs,
-        http,
-        dir: this.dir,
-        url: this.url,
-        ref: this.branch,
-        singleBranch: true,
-        onAuth,
-        onProgress: this.onProgress
-          ? (event) => {
-              this.onProgress!({
-                phase: event.phase,
-                loaded: event.loaded,
-                total: event.total,
-                lengthComputable: event.total > 0,
-              });
-            }
-          : undefined,
+        await git.fetch({
+          fs,
+          http,
+          dir: this.dir,
+          url: this.url,
+          ref: this.branch,
+          corsProxy: this.corsProxy,
+          singleBranch: true,
+          onProgress: this.onProgress
+            ? (event) => {
+                this.onProgress!({
+                  phase: event.phase,
+                  loaded: event.loaded,
+                  total: event.total,
+                  lengthComputable: event.total > 0,
+                });
+              }
+            : undefined,
+        });
+
+        const headSha = await git.resolveRef({
+          fs,
+          dir: this.dir,
+          ref: this.branch,
+        });
+
+        const state: RepoState = {
+          owner: this.owner,
+          repo: this.repo,
+          branch: this.branch,
+          lastFetchAt: Date.now(),
+          headCommitSha: headSha,
+          totalSizeBytes: 0,
+          cloneComplete: true,
+        };
+
+        await setRepoMetadata({ ...state });
+        return state;
       });
-
-      const headSha = await git.resolveRef({
-        fs,
-        dir: this.dir,
-        ref: this.branch,
-      });
-
-      const state: RepoState = {
-        owner: this.owner,
-        repo: this.repo,
-        branch: this.branch,
-        lastFetchAt: Date.now(),
-        headCommitSha: headSha,
-        totalSizeBytes: 0,
-        cloneComplete: true,
-      };
-
-      await setRepoMetadata({ ...state });
-      return state;
-    });
+    } catch (err) {
+      throw friendlyCloneError(err, this.owner, this.repo, this.corsProxy);
+    }
   }
 
   async cloneOrFetch(ttlSeconds: number): Promise<RepoState> {
