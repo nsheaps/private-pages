@@ -15,6 +15,32 @@ import { SiteView } from './SiteView';
 import type { ValidatedConfig } from '../config/schema';
 import type { AuthProvider, DeviceFlowState, TokenInfo, UserInfo } from '../auth/types';
 
+const GITHUB_API_URL = 'https://api.github.com';
+
+async function fetchGitHubUser(accessToken: string): Promise<UserInfo> {
+  const response = await fetch(`${GITHUB_API_URL}/user`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user info (HTTP ${String(response.status)})`);
+  }
+  const data = (await response.json()) as {
+    id: number;
+    login: string;
+    avatar_url: string;
+    name: string | null;
+  };
+  return {
+    id: data.id,
+    login: data.login,
+    avatarUrl: data.avatar_url,
+    name: data.name,
+  };
+}
+
 type AppState =
   | { phase: 'loading-config' }
   | { phase: 'no-config' }
@@ -136,16 +162,13 @@ function AppContent({
     ) {
       providers.pkce
         .login()
-        .then((token) => {
-          return providers.pkce!.loadStoredToken().then((stored) => {
-            if (stored) {
-              setState({
-                phase: 'ready',
-                config: currentConfig,
-                token,
-                user: stored.user,
-              });
-            }
+        .then(async (token) => {
+          const user = await fetchGitHubUser(token.accessToken);
+          setState({
+            phase: 'ready',
+            config: currentConfig,
+            token,
+            user,
           });
         })
         .catch((err: unknown) => {
@@ -196,16 +219,13 @@ function AppContent({
 
     dfProvider
       .login((flowState) => setDeviceFlowState(flowState))
-      .then((token) => {
-        return dfProvider.loadStoredToken().then((stored) => {
-          if (stored) {
-            setState({
-              phase: 'ready',
-              config: currentConfig,
-              token,
-              user: stored.user,
-            });
-          }
+      .then(async (token) => {
+        const user = await fetchGitHubUser(token.accessToken);
+        setState({
+          phase: 'ready',
+          config: currentConfig,
+          token,
+          user,
         });
       })
       .catch((err: unknown) => {
@@ -222,16 +242,13 @@ function AppContent({
 
     providers.pat
       .login(token)
-      .then((tokenInfo) => {
-        return providers.pat.loadStoredToken().then((stored) => {
-          if (stored) {
-            setState({
-              phase: 'ready',
-              config: currentConfig,
-              token: tokenInfo,
-              user: stored.user,
-            });
-          }
+      .then(async (tokenInfo) => {
+        const user = await fetchGitHubUser(tokenInfo.accessToken);
+        setState({
+          phase: 'ready',
+          config: currentConfig,
+          token: tokenInfo,
+          user,
         });
       })
       .catch((err: unknown) => {
