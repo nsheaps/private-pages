@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 export interface RepoPickerPageProps {
   token: string;
   userLogin: string;
-  onSelectRepo: (repo: string) => void;
+  onSelectRepo: (repo: string, branch: string) => void;
   onLogout: () => void;
 }
 
@@ -14,6 +14,10 @@ interface GitHubRepo {
   updated_at: string;
   default_branch: string;
   has_pages: boolean;
+}
+
+interface BranchInfo {
+  name: string;
 }
 
 export function RepoPickerPage({
@@ -106,7 +110,7 @@ export function RepoPickerPage({
               <h2>Private Repositories</h2>
               <ul>
                 {privateRepos.map((repo) => (
-                  <RepoCard key={repo.full_name} repo={repo} onSelect={onSelectRepo} />
+                  <RepoCard key={repo.full_name} repo={repo} token={token} onSelect={onSelectRepo} />
                 ))}
               </ul>
             </>
@@ -116,7 +120,7 @@ export function RepoPickerPage({
               <h2>Public Repositories</h2>
               <ul>
                 {publicRepos.map((repo) => (
-                  <RepoCard key={repo.full_name} repo={repo} onSelect={onSelectRepo} />
+                  <RepoCard key={repo.full_name} repo={repo} token={token} onSelect={onSelectRepo} />
                 ))}
               </ul>
             </>
@@ -132,16 +136,47 @@ export function RepoPickerPage({
 
 function RepoCard({
   repo,
+  token,
   onSelect,
 }: {
   repo: GitHubRepo;
-  onSelect: (repo: string) => void;
+  token: string;
+  onSelect: (repo: string, branch: string) => void;
 }) {
+  const [selectedBranch, setSelectedBranch] = useState('gh-pages');
+  const [branches, setBranches] = useState<string[] | null>(null);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  const loadBranches = useCallback(async () => {
+    if (branches !== null || loadingBranches) return;
+    setLoadingBranches(true);
+    try {
+      const [owner, repoName] = repo.full_name.split('/');
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repoName}/branches?per_page=100`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } },
+      );
+      if (res.ok) {
+        const data = (await res.json()) as BranchInfo[];
+        const branchNames = data.map((b) => b.name);
+        setBranches(branchNames);
+        // If gh-pages doesn't exist, fall back to repo's default branch
+        if (!branchNames.includes('gh-pages')) {
+          setSelectedBranch(repo.default_branch);
+        }
+      }
+    } catch {
+      // Silently fail — user keeps the default branch
+    } finally {
+      setLoadingBranches(false);
+    }
+  }, [branches, loadingBranches, repo.full_name, token, repo.default_branch]);
+
   return (
     <li className="pp-site-card">
       <button
         className="pp-site-link"
-        onClick={() => onSelect(repo.full_name)}
+        onClick={() => onSelect(repo.full_name, selectedBranch)}
       >
         <div>
           <span className="pp-site-name">{repo.full_name}</span>
@@ -149,8 +184,35 @@ function RepoCard({
             <span className="pp-repo-description">{repo.description}</span>
           )}
         </div>
-        <span className="pp-site-branch">{repo.default_branch}</span>
       </button>
+      {branches !== null && branches.length > 1 ? (
+        <select
+          className="pp-branch-select"
+          value={selectedBranch}
+          onChange={(e) => {
+            e.stopPropagation();
+            setSelectedBranch(e.target.value);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select branch for ${repo.full_name}`}
+        >
+          {branches.map((b) => (
+            <option key={b} value={b}>{b}</option>
+          ))}
+        </select>
+      ) : (
+        <button
+          className="pp-branch-label"
+          onClick={(e) => {
+            e.stopPropagation();
+            void loadBranches();
+          }}
+          title="Click to load branches"
+          aria-label={`Load branches for ${repo.full_name}`}
+        >
+          {loadingBranches ? '...' : selectedBranch}
+        </button>
+      )}
     </li>
   );
 }

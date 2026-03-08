@@ -20,12 +20,13 @@ interface SiteViewProps {
   token: TokenInfo;
   userLogin: string;
   onLogout: () => void;
+  onBack?: () => void;
 }
 
 type ViewState =
   | { phase: 'cloning'; siteConfig: SiteConfig }
   | { phase: 'clone-error'; siteConfig: SiteConfig; error: string }
-  | { phase: 'rendering'; siteConfig: SiteConfig; repoState: RepoState }
+  | { phase: 'rendering'; siteConfig: SiteConfig; repoState: RepoState | null }
   | { phase: 'render-error'; siteConfig: SiteConfig; error: string }
   | { phase: 'not-found'; siteConfig: SiteConfig };
 
@@ -34,12 +35,43 @@ function parseSiteRepo(repo: string): { owner: string; repoName: string } {
   return { owner: owner!, repoName: repoName! };
 }
 
-export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) {
+const GITHUB_API_URL = 'https://api.github.com';
+
+interface BranchInfo {
+  name: string;
+}
+
+async function fetchBranches(
+  owner: string,
+  repo: string,
+  token: string,
+): Promise<string[]> {
+  try {
+    const response = await fetch(
+      `${GITHUB_API_URL}/repos/${owner}/${repo}/branches?per_page=100`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+        },
+      },
+    );
+    if (!response.ok) return [];
+    const data = (await response.json()) as BranchInfo[];
+    return data.map((b) => b.name);
+  } catch {
+    return [];
+  }
+}
+
+export function SiteView({ config, token, userLogin, onLogout, onBack }: SiteViewProps) {
   const { route } = useRouter();
   const [viewState, setViewState] = useState<ViewState | null>(null);
   const [cloneProgress, setCloneProgress] = useState<CloneProgress | null>(null);
   const [repoState, setRepoState] = useState<RepoState | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
+  const [branches, setBranches] = useState<string[]>([]);
+  const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<PageRenderer | null>(null);
 
@@ -48,16 +80,39 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
     route.path === site.path || route.path.startsWith(site.path + '/'),
   ) ?? config.sites[0];
 
-  // Clone/fetch the repo
+  // Use the config branch directly and fetch the branch list for the dropdown.
   useEffect(() => {
     if (!matchedSite) return;
+
+    const { owner, repoName } = parseSiteRepo(matchedSite.repo);
+    setActiveBranch(matchedSite.branch);
+
+    fetchBranches(owner, repoName, token.accessToken).then((branchList) => {
+      setBranches(branchList);
+      // If the configured branch doesn't exist, fall back to a valid one
+      if (branchList.length > 0 && !branchList.includes(matchedSite.branch)) {
+        const fallback = branchList.includes('gh-pages')
+          ? 'gh-pages'
+          : branchList.includes('main')
+            ? 'main'
+            : branchList[0]!;
+        setActiveBranch(fallback);
+      }
+    }).catch(() => { /* dropdown won't populate */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when repo/branch changes
+  }, [matchedSite?.repo, matchedSite?.branch, token.accessToken]);
+
+  // Clone/fetch the repo once we know the branch
+  useEffect(() => {
+    if (!matchedSite || !activeBranch) return;
 
     const { owner, repoName } = parseSiteRepo(matchedSite.repo);
     const client = new GitClient({
       owner,
       repo: repoName,
-      branch: matchedSite.branch,
+      branch: activeBranch,
       token: token.accessToken,
+      corsProxy: config.github.corsProxy,
       onProgress: setCloneProgress,
     });
 
@@ -71,18 +126,18 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
         setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: state });
         setSyncStatus('idle');
       })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Clone failed';
-        setViewState({ phase: 'clone-error', siteConfig: matchedSite, error: message });
-        setSyncStatus('error');
+      .catch(() => {
+        // Clone/fetch failed — fall back to API-only rendering
+        setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: null });
+        setSyncStatus('idle');
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depend on repo/branch only
-  }, [matchedSite?.repo, matchedSite?.branch, token.accessToken]);
+  }, [matchedSite?.repo, activeBranch, token.accessToken]);
 
   // Render content when route changes and repo is ready
   const renderContent = useCallback(async () => {
     if (!viewState || viewState.phase !== 'rendering' || !containerRef.current) return;
-    if (!matchedSite) return;
+    if (!matchedSite || !activeBranch) return;
 
     const { owner, repoName } = parseSiteRepo(matchedSite.repo);
     const gitFetcher = new GitContentFetcher(token.accessToken);
@@ -98,7 +153,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
       fetcher,
       owner,
       repoName,
-      matchedSite.branch,
+      activeBranch,
       subPath,
       matchedSite.directory,
     );
@@ -109,7 +164,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
         fetcher,
         owner,
         repoName,
-        matchedSite.branch,
+        activeBranch,
         matchedSite.directory,
       );
 
@@ -132,7 +187,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
       window.open(url, '_blank');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- renderHtml is stable, matchedSite captured by closure
-  }, [viewState, route.path, matchedSite, token.accessToken]);
+  }, [viewState, route.path, matchedSite, activeBranch, token.accessToken]);
 
   function renderHtml(
     content: Uint8Array,
@@ -140,7 +195,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
     owner: string,
     repoName: string,
   ) {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !activeBranch) return;
 
     // Clean up previous renderer
     rendererRef.current?.cleanup();
@@ -154,7 +209,7 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
         {
           owner,
           repo: repoName,
-          branch: siteConfig.branch,
+          branch: activeBranch,
           basePath: siteConfig.path,
         },
         route.path.slice(siteConfig.path.length) || '/',
@@ -184,87 +239,122 @@ export function SiteView({ config, token, userLogin, onLogout }: SiteViewProps) 
     };
   }, []);
 
+  const handleBranchChange = useCallback((branch: string) => {
+    setActiveBranch(branch);
+    setRepoState(null);
+    setCloneProgress(null);
+  }, []);
+
   if (!matchedSite) {
     return <ErrorScreen message="No site configured for this path." />;
   }
 
+  const statusBar = (
+    <>
+      <StatusBar
+        syncStatus={syncStatus}
+        commitSha={repoState?.headCommitSha}
+        lastUpdated={repoState?.lastFetchAt}
+        repoName={matchedSite.repo}
+        branch={activeBranch ?? matchedSite.branch}
+        branches={branches}
+        onBranchChange={handleBranchChange}
+        onBack={onBack}
+      />
+      <div className="pp-user-info">
+        Signed in as {userLogin}{' '}
+        <button onClick={onLogout} className="pp-logout-link">
+          Sign out
+        </button>
+      </div>
+    </>
+  );
+
   if (!viewState) {
-    return <LoadingScreen message="Initializing..." />;
+    return (
+      <>
+        <LoadingScreen message="Initializing..." />
+        {statusBar}
+      </>
+    );
   }
 
   switch (viewState.phase) {
+
     case 'cloning':
       return (
-        <CloneProgressScreen
-          repoName={matchedSite.repo}
-          progress={cloneProgress}
-        />
+        <>
+          <CloneProgressScreen
+            repoName={matchedSite.repo}
+            progress={cloneProgress}
+          />
+          {statusBar}
+        </>
       );
 
     case 'clone-error':
       return (
-        <CloneProgressScreen
-          repoName={matchedSite.repo}
-          progress={null}
-          error={viewState.error}
-          onRetry={() => {
-            setViewState({ phase: 'cloning', siteConfig: matchedSite });
-            const { owner, repoName } = parseSiteRepo(matchedSite.repo);
-            const client = new GitClient({
-              owner,
-              repo: repoName,
-              branch: matchedSite.branch,
-              token: token.accessToken,
-              onProgress: setCloneProgress,
-            });
-            client
-              .cloneOrFetch(0) // Force refresh
-              .then((state) => {
-                setRepoState(state);
-                setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: state });
-                setSyncStatus('idle');
-              })
-              .catch((err: unknown) => {
-                const message = err instanceof Error ? err.message : 'Clone failed';
-                setViewState({ phase: 'clone-error', siteConfig: matchedSite, error: message });
-                setSyncStatus('error');
+        <>
+          <CloneProgressScreen
+            repoName={matchedSite.repo}
+            progress={null}
+            error={viewState.error}
+            onRetry={() => {
+              if (!activeBranch) return;
+              setViewState({ phase: 'cloning', siteConfig: matchedSite });
+              const { owner, repoName } = parseSiteRepo(matchedSite.repo);
+              const client = new GitClient({
+                owner,
+                repo: repoName,
+                branch: activeBranch,
+                token: token.accessToken,
+                corsProxy: config.github.corsProxy,
+                onProgress: setCloneProgress,
               });
-          }}
-        />
+              client
+                .cloneOrFetch(0)
+                .then((state) => {
+                  setRepoState(state);
+                  setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: state });
+                  setSyncStatus('idle');
+                })
+                .catch(() => {
+                  setViewState({ phase: 'rendering', siteConfig: matchedSite, repoState: null });
+                  setSyncStatus('idle');
+                });
+            }}
+          />
+          {statusBar}
+        </>
       );
 
     case 'not-found':
       return (
-        <ErrorScreen
-          title="Page Not Found"
-          message={`The path "${route.path}" was not found in ${matchedSite.repo}.`}
-        />
+        <>
+          <ErrorScreen
+            title="Page Not Found"
+            message={`The path "${route.path}" was not found in ${matchedSite.repo} (branch: ${activeBranch ?? matchedSite.branch}).`}
+          />
+          {statusBar}
+        </>
       );
 
     case 'render-error':
       return (
-        <ErrorScreen
-          title="Render Error"
-          message={viewState.error}
-        />
+        <>
+          <ErrorScreen
+            title="Render Error"
+            message={viewState.error}
+          />
+          {statusBar}
+        </>
       );
 
     case 'rendering':
       return (
         <>
           <div ref={containerRef} className="pp-content-container" />
-          <StatusBar
-            syncStatus={syncStatus}
-            commitSha={repoState?.headCommitSha}
-            lastUpdated={repoState?.lastFetchAt}
-            repoName={matchedSite.repo}
-          />
-          <div className="pp-user-info">
-            Signed in as {userLogin}{' '}
-            <button onClick={onLogout} className="pp-logout-link">
-              Sign out
-            </button>
-          </div>
+          {statusBar}
         </>
       );
   }

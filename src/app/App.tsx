@@ -15,6 +15,32 @@ import { SiteView } from './SiteView';
 import type { ValidatedConfig } from '../config/schema';
 import type { AuthProvider, DeviceFlowState, TokenInfo, UserInfo } from '../auth/types';
 
+const GITHUB_API_URL = 'https://api.github.com';
+
+async function fetchGitHubUser(accessToken: string): Promise<UserInfo> {
+  const response = await fetch(`${GITHUB_API_URL}/user`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user info (HTTP ${String(response.status)})`);
+  }
+  const data = (await response.json()) as {
+    id: number;
+    login: string;
+    avatar_url: string;
+    name: string | null;
+  };
+  return {
+    id: data.id,
+    login: data.login,
+    avatarUrl: data.avatar_url,
+    name: data.name,
+  };
+}
+
 type AppState =
   | { phase: 'loading-config' }
   | { phase: 'no-config' }
@@ -87,7 +113,7 @@ function createProviders(config: ValidatedConfig) {
   return {
     pat: new PatFlowProvider(),
     pkce: hasClientId
-      ? new PkceFlowProvider(config.github.clientId, 'repo', config.github.callbackUrl)
+      ? new PkceFlowProvider(config.github.clientId, 'repo', config.github.callbackUrl, config.github.corsProxy)
       : null,
     deviceFlow: hasClientId
       ? new DeviceFlowProvider(config.github.clientId, 'repo', config.github.corsProxy)
@@ -136,16 +162,13 @@ function AppContent({
     ) {
       providers.pkce
         .login()
-        .then((token) => {
-          return providers.pkce!.loadStoredToken().then((stored) => {
-            if (stored) {
-              setState({
-                phase: 'ready',
-                config: currentConfig,
-                token,
-                user: stored.user,
-              });
-            }
+        .then(async (token) => {
+          const user = await fetchGitHubUser(token.accessToken);
+          setState({
+            phase: 'ready',
+            config: currentConfig,
+            token,
+            user,
           });
         })
         .catch((err: unknown) => {
@@ -196,16 +219,13 @@ function AppContent({
 
     dfProvider
       .login((flowState) => setDeviceFlowState(flowState))
-      .then((token) => {
-        return dfProvider.loadStoredToken().then((stored) => {
-          if (stored) {
-            setState({
-              phase: 'ready',
-              config: currentConfig,
-              token,
-              user: stored.user,
-            });
-          }
+      .then(async (token) => {
+        const user = await fetchGitHubUser(token.accessToken);
+        setState({
+          phase: 'ready',
+          config: currentConfig,
+          token,
+          user,
         });
       })
       .catch((err: unknown) => {
@@ -222,16 +242,13 @@ function AppContent({
 
     providers.pat
       .login(token)
-      .then((tokenInfo) => {
-        return providers.pat.loadStoredToken().then((stored) => {
-          if (stored) {
-            setState({
-              phase: 'ready',
-              config: currentConfig,
-              token: tokenInfo,
-              user: stored.user,
-            });
-          }
+      .then(async (tokenInfo) => {
+        const user = await fetchGitHubUser(tokenInfo.accessToken);
+        setState({
+          phase: 'ready',
+          config: currentConfig,
+          token: tokenInfo,
+          user,
         });
       })
       .catch((err: unknown) => {
@@ -326,6 +343,7 @@ function AppContent({
           deviceFlowState={deviceFlowState}
           onDeviceFlowCancel={cancelDeviceFlow}
           availableMethods={wizardMethods}
+          hasCorsProxy={Boolean(config?.github.corsProxy)}
         />
       );
 
@@ -406,6 +424,14 @@ function ReadyView({
   const { route, navigate } = useRouter();
   const hasSites = config.sites.length > 0;
 
+  // Clear leftover login hash (e.g. #/login/pat-input) so we don't
+  // misinterpret it as an ad-hoc owner/repo route.
+  useEffect(() => {
+    if (route.path.startsWith('/login')) {
+      navigate('/');
+    }
+  }, [route.path, navigate]);
+
   // For ad-hoc mode (no sites), parse owner/repo from the hash
   const adHocParsed = !hasSites ? parseAdHocRoute(route.segments) : null;
 
@@ -435,14 +461,17 @@ function ReadyView({
 
   // No sites configured: ad-hoc mode
   if (adHocParsed) {
-    // Build a temporary config with the ad-hoc repo
+    // Build a temporary config with the ad-hoc repo.
+    // The site path must match the full route path (including @branch)
+    // so that subPath calculation in SiteView works correctly.
+    const routeBase = route.path.split('/').slice(0, 3).join('/');
     const adHocConfig: ValidatedConfig = {
       ...config,
       sites: [
         {
-          path: `/${adHocParsed.owner}/${adHocParsed.repo}`,
+          path: routeBase,
           repo: `${adHocParsed.owner}/${adHocParsed.repo}`,
-          branch: 'main',
+          branch: adHocParsed.branch ?? 'gh-pages',
           directory: '/',
           fetchTtlSeconds: 60,
         },
@@ -454,6 +483,7 @@ function ReadyView({
         token={token}
         userLogin={user.login}
         onLogout={onLogout}
+        onBack={() => navigate('/')}
       />
     );
   }
@@ -463,15 +493,29 @@ function ReadyView({
     <RepoPickerPage
       token={token.accessToken}
       userLogin={user.login}
-      onSelectRepo={(repo) => navigate(`/${repo}`)}
+      onSelectRepo={(repo, branch) => navigate(`/${repo}@${branch}`)}
       onLogout={onLogout}
     />
   );
 }
 
+const RESERVED_ROUTES = new Set(['login', 'auth', 'setup', 'help']);
+
 function parseAdHocRoute(
   segments: string[],
-): { owner: string; repo: string } | null {
+): { owner: string; repo: string; branch?: string } | null {
   if (segments.length < 2) return null;
-  return { owner: segments[0]!, repo: segments[1]! };
+  if (RESERVED_ROUTES.has(segments[0]!)) return null;
+
+  // Parse optional @branch suffix from repo segment: "repo@branch"
+  const repoSegment = segments[1]!;
+  const atIndex = repoSegment.indexOf('@');
+  if (atIndex > 0) {
+    return {
+      owner: segments[0]!,
+      repo: repoSegment.slice(0, atIndex),
+      branch: repoSegment.slice(atIndex + 1),
+    };
+  }
+  return { owner: segments[0]!, repo: repoSegment };
 }

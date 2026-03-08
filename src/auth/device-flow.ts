@@ -41,7 +41,7 @@ export class DeviceFlowProvider implements AuthProvider {
   private proxyUrl(url: string): string {
     if (!this.corsProxy) return url;
     const proxy = this.corsProxy.replace(/\/+$/, '');
-    return `${proxy}/${url}`;
+    return `${proxy}/${url.replace(/^https?:\/\//, '')}`;
   }
 
   async login(onStateChange?: DeviceFlowCallback): Promise<TokenInfo> {
@@ -114,14 +114,24 @@ export class DeviceFlowProvider implements AuthProvider {
       scope: this.scope,
     });
 
-    const response = await fetch(this.proxyUrl(GITHUB_DEVICE_CODE_URL), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-      },
-      body,
-      signal: this.abortController?.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.proxyUrl(GITHUB_DEVICE_CODE_URL), {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+        },
+        body,
+        signal: this.abortController?.signal,
+      });
+    } catch (err) {
+      const hint = this.corsProxy
+        ? 'The CORS proxy may not support POST requests. Try a different proxy or use PAT authentication.'
+        : "GitHub's OAuth endpoints do not support browser requests (CORS). Configure a CORS proxy that supports POST, or use PAT authentication instead.";
+      throw new AuthError(
+        `${err instanceof Error ? err.message : 'Network error'}. ${hint}`,
+      );
+    }
 
     if (!response.ok) {
       throw new AuthError(

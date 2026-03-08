@@ -44,6 +44,7 @@
       var clientId = sessionStorage.getItem('pp_pkce_client_id');
       var redirectUri = sessionStorage.getItem('pp_pkce_redirect_uri');
       var returnUrl = sessionStorage.getItem('pp_pkce_return_url');
+      var corsProxy = sessionStorage.getItem('pp_pkce_cors_proxy');
 
       if (!storedState || !verifier || !clientId || !returnUrl) {
         showError(
@@ -69,7 +70,13 @@
           body.set('redirect_uri', redirectUri);
         }
 
-        var response = await fetch('https://github.com/login/oauth/access_token', {
+        var tokenUrl = 'https://github.com/login/oauth/access_token';
+        if (corsProxy) {
+          var proxy = corsProxy.replace(/\/+$/, '');
+          tokenUrl = proxy + '/' + tokenUrl.replace(/^https?:\/\//, '');
+        }
+
+        var response = await fetch(tokenUrl, {
           method: 'POST',
           headers: { Accept: 'application/json' },
           body: body,
@@ -94,7 +101,10 @@
           scope: data.scope,
         }));
       } catch (err) {
-        showError('Token exchange failed: ' + (err.message || 'network error'));
+        var hint = corsProxy
+          ? 'The CORS proxy may not support POST requests. Try a different proxy or use PAT authentication.'
+          : 'GitHub\'s OAuth endpoints do not support browser requests (CORS). Configure a CORS proxy that supports POST, or use PAT authentication instead.';
+        showError('Token exchange failed: ' + (err.message || 'network error') + '. ' + hint);
         return;
       }
 
@@ -104,6 +114,7 @@
       sessionStorage.removeItem('pp_pkce_client_id');
       sessionStorage.removeItem('pp_pkce_redirect_uri');
       sessionStorage.removeItem('pp_pkce_return_url');
+      sessionStorage.removeItem('pp_pkce_cors_proxy');
 
       // Redirect back to the originating deployment
       window.location.replace(returnUrl);

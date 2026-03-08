@@ -9,6 +9,7 @@ interface ChooseMethodStepProps {
     deviceFlow?: boolean;
     directUrl?: boolean;
   };
+  hasCorsProxy?: boolean;
 }
 
 interface MethodOption {
@@ -18,18 +19,19 @@ interface MethodOption {
   enabled: boolean;
 }
 
-export function ChooseMethodStep({ onChoose, error, availableMethods }: ChooseMethodStepProps) {
+export function ChooseMethodStep({ onChoose, error, availableMethods, hasCorsProxy }: ChooseMethodStepProps) {
+  const corsWarning = !hasCorsProxy ? ' Requires a CORS proxy (not configured).' : '';
   const options: MethodOption[] = [
     {
       step: 'github-app',
       title: 'Sign in with GitHub',
-      description: 'Authorize via your browser using the GitHub App OAuth flow.',
+      description: `Authorize via your browser using the GitHub App OAuth flow.${corsWarning}`,
       enabled: availableMethods.githubApp ?? false,
     },
     {
       step: 'device-flow',
       title: 'Device Flow',
-      description: 'Sign in by entering a code on github.com. Works in restricted environments.',
+      description: `Sign in by entering a code on github.com.${corsWarning}`,
       enabled: availableMethods.deviceFlow ?? false,
     },
     {

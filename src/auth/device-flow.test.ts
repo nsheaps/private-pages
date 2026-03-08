@@ -165,10 +165,10 @@ describe('DeviceFlowProvider', () => {
       await proxyProvider.login();
 
       expect(mockFetch.mock.calls[0]![0]).toBe(
-        'https://proxy.example.com/https://github.com/login/device/code',
+        'https://proxy.example.com/github.com/login/device/code',
       );
       expect(mockFetch.mock.calls[1]![0]).toBe(
-        'https://proxy.example.com/https://github.com/login/oauth/access_token',
+        'https://proxy.example.com/github.com/login/oauth/access_token',
       );
     });
   });

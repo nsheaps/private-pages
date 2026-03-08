@@ -25,6 +25,8 @@ export interface LoginWizardProps {
     deviceFlow?: boolean;
     directUrl?: boolean;
   };
+  /** Whether a CORS proxy is configured (needed for PKCE/device flow) */
+  hasCorsProxy?: boolean;
 }
 
 /** Steps ordered by depth for determining slide direction */
@@ -69,6 +71,7 @@ export function LoginWizard({
   deviceFlowState,
   onDeviceFlowCancel,
   availableMethods,
+  hasCorsProxy,
 }: LoginWizardProps) {
   // Initialize from hash if it contains a valid wizard step
   const initialStep = hashToStep() ?? 'choose-method';
@@ -199,6 +202,7 @@ export function LoginWizard({
             onChoose={goTo}
             error={displayError}
             availableMethods={methods}
+            hasCorsProxy={hasCorsProxy}
           />
         );
 

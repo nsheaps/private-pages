@@ -20,5 +20,6 @@ export interface GitClientOptions {
   repo: string;
   branch: string;
   token: string;
+  corsProxy?: string;
   onProgress?: (progress: CloneProgress) => void;
 }

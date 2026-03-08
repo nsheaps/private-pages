@@ -3,6 +3,10 @@ export interface StatusBarProps {
   commitSha?: string;
   lastUpdated?: number;
   repoName?: string;
+  branch?: string;
+  branches?: string[];
+  onBranchChange?: (branch: string) => void;
+  onBack?: () => void;
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -18,10 +22,37 @@ export function StatusBar({
   commitSha,
   lastUpdated,
   repoName,
+  branch,
+  branches,
+  onBranchChange,
+  onBack,
 }: StatusBarProps) {
+  const hasBranchOptions = branches && branches.length > 1 && onBranchChange;
+
   return (
     <div className="pp-status-bar" role="status">
+      {onBack && (
+        <button className="pp-status-back" onClick={onBack} aria-label="Back to repo list">
+          &larr;
+        </button>
+      )}
       {repoName && <span className="pp-status-repo">{repoName}</span>}
+      {branch && (
+        hasBranchOptions ? (
+          <select
+            className="pp-status-branch-select"
+            value={branch}
+            onChange={(e) => onBranchChange(e.target.value)}
+            aria-label="Select branch"
+          >
+            {branches.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="pp-status-branch">{branch}</span>
+        )
+      )}
       {commitSha && (
         <span className="pp-status-sha" title={commitSha}>
           {commitSha.slice(0, 7)}
