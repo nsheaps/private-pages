@@ -9,9 +9,16 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'isomorphic-git': ['isomorphic-git'],
-          react: ['react', 'react-dom'],
+        manualChunks(id) {
+          if (id.includes('node_modules/isomorphic-git')) {
+            return 'isomorphic-git';
+          }
+          if (
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react/')
+          ) {
+            return 'react';
+          }
         },
       },
     },
