@@ -1,9 +1,0 @@
-{
-  "name": "Private Pages",
-  "short_name": "Private Pages",
-  "description": "Client-only GitHub Pages for private repos",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#24292e"
-}
