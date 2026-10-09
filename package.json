@@ -36,8 +36,8 @@
   "dependencies": {
     "idb": "^8.0.3",
     "isomorphic-git": "^1.41.9",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
