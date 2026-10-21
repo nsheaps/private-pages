@@ -72,10 +72,7 @@ self.addEventListener("install", () => {
 	e.waitUntil(self.clients.claim());
 }), self.addEventListener("fetch", (e) => {
 	let t = new URL(e.request.url);
-	if (n(t.pathname)) {
-		e.respondWith(s(t.pathname));
-		return;
-	}
+	n(t.pathname) && e.respondWith(s(t.pathname));
 });
 async function s(e) {
 	let n = t(e);
