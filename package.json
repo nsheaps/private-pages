@@ -34,8 +34,8 @@
     "validate": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
-    "idb": "^8.0.3",
-    "isomorphic-git": "^1.43.0",
+    "idb": "^8.0.4",
+    "isomorphic-git": "^1.43.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"
